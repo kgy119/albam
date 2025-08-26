@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // 컬러 팔레트
-  static const Color primaryColor = Color(0xFF2196F3);
-  static const Color primaryLightColor = Color(0xFF64B5F6);
-  static const Color primaryDarkColor = Color(0xFF1976D2);
-  static const Color accentColor = Color(0xFF03DAC6);
+  // 컬러 팔레트 (세련된 바이올렛)
+  static const Color primaryColor = Color(0xFF7C4DFF);
+  static const Color primaryLightColor = Color(0xFFB085FF);
+  static const Color primaryDarkColor = Color(0xFF3F1DCB);
+  static const Color accentColor = Color(0xFF00BCD4);
   static const Color backgroundColor = Color(0xFFF5F5F5);
   static const Color surfaceColor = Colors.white;
   static const Color errorColor = Color(0xFFB00020);

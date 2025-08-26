@@ -24,25 +24,25 @@ class HomeView extends GetView<WorkplaceController> {
           ),
         ],
       ),
-      body: const Center(
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               Icons.business,
               size: 64,
-              color: Colors.grey,
+              color: Theme.of(context).primaryColor.withOpacity(0.5),
             ),
-            SizedBox(height: 16),
-            Text(
+            const SizedBox(height: 16),
+            const Text(
               '등록된 사업장이 없습니다',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey,
               ),
             ),
-            SizedBox(height: 8),
-            Text(
+            const SizedBox(height: 8),
+            const Text(
               '새로운 사업장을 추가해보세요',
               style: TextStyle(
                 fontSize: 14,

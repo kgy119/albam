@@ -17,16 +17,24 @@ class LoginView extends GetView<AuthController> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // 앱 로고/제목
-                  const Icon(
-                    Icons.work,
-                    size: 80,
-                    color: Colors.blue,
+                  Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(60),
+                    ),
+                    child: Icon(
+                      Icons.work_rounded,
+                      size: 60,
+                      color: Theme.of(context).primaryColor,
+                    ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 32),
                   Text(
                     'Albam',
                     style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      color: Colors.blue,
+                      color: Theme.of(context).primaryColor,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -37,170 +45,135 @@ class LoginView extends GetView<AuthController> {
                       color: Colors.grey[600],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '간편하게 로그인하고 시작하세요',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                  const SizedBox(height: 64),
+
+                  // Google 로그인 버튼
+                  Obx(() => SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: controller.isGoogleLoading.value
+                          ? null
+                          : controller.signInWithGoogle,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black87,
+                        elevation: 2,
+                        side: BorderSide(color: Colors.grey[300]!),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: controller.isGoogleLoading.value
+                          ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.grey,
+                        ),
+                      )
+                          : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(
+                            'assets/images/google_logo.png',
+                            height: 24,
+                            width: 24,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Icons.g_mobiledata,
+                                size: 24,
+                                color: Colors.red,
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Google로 계속하기',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )),
+
+                  const SizedBox(height: 16),
+
+                  // 카카오 로그인 버튼
+                  Obx(() => SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: controller.isKakaoLoading.value
+                          ? null
+                          : controller.signInWithKakao,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFFE812),
+                        foregroundColor: const Color(0xFF3C1E1E),
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: controller.isKakaoLoading.value
+                          ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF3C1E1E),
+                        ),
+                      )
+                          : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF3C1E1E),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.chat_bubble,
+                              size: 14,
+                              color: Color(0xFFFFE812),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            '카카오톡으로 계속하기',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )),
+
                   const SizedBox(height: 48),
 
-                  // 로그인/회원가입 폼
-                  Form(
-                    key: controller.formKey,
-                    child: Column(
-                      children: [
-                        // 로그인/회원가입 토글
-                        Obx(() => Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () {
-                                    if (!controller.isLoginMode.value) {
-                                      controller.toggleMode();
-                                    }
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: controller.isLoginMode.value
-                                          ? Colors.blue
-                                          : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(25),
-                                    ),
-                                    child: Text(
-                                      '로그인',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: controller.isLoginMode.value
-                                            ? Colors.white
-                                            : Colors.grey[600],
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () {
-                                    if (controller.isLoginMode.value) {
-                                      controller.toggleMode();
-                                    }
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: !controller.isLoginMode.value
-                                          ? Colors.blue
-                                          : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(25),
-                                    ),
-                                    child: Text(
-                                      '회원가입',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: !controller.isLoginMode.value
-                                            ? Colors.white
-                                            : Colors.grey[600],
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )),
-                        const SizedBox(height: 32),
-
-                        // 이메일 입력
-                        TextFormField(
-                          controller: controller.emailController,
-                          decoration: const InputDecoration(
-                            labelText: '이메일',
-                            hintText: 'example@email.com',
-                            prefixIcon: Icon(Icons.email_outlined),
-                          ),
-                          keyboardType: TextInputType.emailAddress,
-                          validator: controller.validateEmail,
-                        ),
-                        const SizedBox(height: 16),
-
-                        // 비밀번호 입력
-                        Obx(() => TextFormField(
-                          controller: controller.passwordController,
-                          decoration: InputDecoration(
-                            labelText: '비밀번호',
-                            hintText: '6자 이상 입력해주세요',
-                            prefixIcon: const Icon(Icons.lock_outlined),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                controller.isPasswordVisible.value
-                                    ? Icons.visibility
-                                    : Icons.visibility_off,
-                              ),
-                              onPressed: controller.togglePasswordVisibility,
-                            ),
-                          ),
-                          obscureText: !controller.isPasswordVisible.value,
-                          validator: controller.validatePassword,
-                        )),
-
-                        // 비밀번호 확인 (회원가입 모드일 때만)
-                        Obx(() => controller.isLoginMode.value
-                            ? const SizedBox.shrink()
-                            : Column(
-                          children: [
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: controller.confirmPasswordController,
-                              decoration: const InputDecoration(
-                                labelText: '비밀번호 확인',
-                                hintText: '비밀번호를 다시 입력해주세요',
-                                prefixIcon: Icon(Icons.lock_outlined),
-                              ),
-                              obscureText: !controller.isPasswordVisible.value,
-                              validator: controller.validateConfirmPassword,
-                            ),
-                          ],
-                        )),
-                        const SizedBox(height: 24),
-
-                        // 로그인/회원가입 버튼
-                        Obx(() => SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: controller.isLoading.value
-                                ? null
-                                : controller.submit,
-                            child: controller.isLoading.value
-                                ? const CircularProgressIndicator(
-                              color: Colors.white,
-                            )
-                                : Text(
-                              controller.isLoginMode.value ? '로그인' : '회원가입',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        )),
-
-                        // 비밀번호 찾기 (로그인 모드일 때만)
-                        Obx(() => controller.isLoginMode.value
-                            ? Column(
-                          children: [
-                            const SizedBox(height: 16),
-                            TextButton(
-                              onPressed: controller.resetPassword,
-                              child: const Text('비밀번호를 잊으셨나요?'),
-                            ),
-                          ],
-                        )
-                            : const SizedBox.shrink()),
-                      ],
+                  // 약관 동의 텍스트
+                  Text(
+                    '계속하면 서비스 이용약관과\n개인정보처리방침에 동의하는 것으로 간주됩니다.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[500],
+                      height: 1.4,
                     ),
                   ),
                 ],
