@@ -12,28 +12,51 @@ class AuthService extends GetxService {
   // 로그인 상태
   RxBool get isLoggedIn => (currentUser.value != null).obs;
 
+  // 초기화 완료 여부
+  RxBool isInitialized = false.obs;
+
   Future<AuthService> init() async {
-    // Firebase Auth 상태 변화 리스너
-    _auth.authStateChanges().listen((User? user) {
-      currentUser.value = user;
-    });
+    try {
+      print('AuthService 초기화 시작'); // 디버깅용
 
-    // 현재 사용자 설정
-    currentUser.value = _auth.currentUser;
+      // 현재 사용자 설정
+      currentUser.value = _auth.currentUser;
 
-    return this;
+      // Firebase Auth 상태 변화 리스너 (빌드 안전하게)
+      _auth.authStateChanges().listen((User? user) {
+        print('Auth state changed: ${user?.uid}'); // 디버깅용
+
+        // 상태 변경을 약간의 딜레이로 실행하여 빌드 중 setState 방지
+        Future.delayed(const Duration(milliseconds: 50), () {
+          currentUser.value = user;
+        });
+      });
+
+      isInitialized.value = true;
+      print('AuthService 초기화 완료'); // 디버깅용
+
+      return this;
+    } catch (e) {
+      print('AuthService 초기화 오류: $e');
+      isInitialized.value = true; // 오류가 발생해도 초기화 완료로 설정
+      return this;
+    }
   }
 
   /// Google 로그인
   Future<UserCredential?> signInWithGoogle() async {
     try {
+      print('Google 로그인 시작'); // 디버깅용
+
       // Google 로그인 프로세스
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
-        // 사용자가 로그인을 취소한 경우
+        print('사용자가 Google 로그인을 취소함'); // 디버깅용
         return null;
       }
+
+      print('Google 사용자 정보 획득: ${googleUser.email}'); // 디버깅용
 
       // Google 인증 정보 획득
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
@@ -44,10 +67,22 @@ class AuthService extends GetxService {
         idToken: googleAuth.idToken,
       );
 
+      print('Firebase 로그인 시도'); // 디버깅용
+
       // Firebase에 로그인
-      return await _auth.signInWithCredential(credential);
+      final UserCredential userCredential = await _auth.signInWithCredential(credential);
+
+      print('Firebase 로그인 완료: ${userCredential.user?.uid}'); // 디버깅용
+
+      return userCredential;
     } catch (e) {
-      Get.snackbar('오류', 'Google 로그인 중 오류가 발생했습니다: $e');
+      print('Google 로그인 오류: $e'); // 디버깅용
+
+      if (e is FirebaseAuthException) {
+        _handleAuthError(e);
+      } else {
+        Get.snackbar('오류', 'Google 로그인 중 오류가 발생했습니다: $e');
+      }
       return null;
     }
   }
@@ -62,10 +97,18 @@ class AuthService extends GetxService {
   /// 로그아웃
   Future<void> signOut() async {
     try {
-      await _googleSignIn.signOut();
-      await _auth.signOut();
+      print('로그아웃 시작'); // 디버깅용
+
+      await Future.wait([
+        _googleSignIn.signOut(),
+        _auth.signOut(),
+      ]);
+
       currentUser.value = null;
+      print('로그아웃 완료'); // 디버깅용
+
     } catch (e) {
+      print('로그아웃 오류: $e'); // 디버깅용
       Get.snackbar('오류', '로그아웃 중 오류가 발생했습니다.');
     }
   }

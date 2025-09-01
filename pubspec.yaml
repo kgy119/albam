@@ -17,15 +17,15 @@ dependencies:
   # 상태 관리
   get: ^4.6.6
 
-  # Firebase 관련 (Firestore 제외하고 테스트)
+  # Firebase 관련
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1
-  # cloud_firestore: ^5.4.3  # 일시적으로 주석처리
+  cloud_firestore: ^5.4.3
 
   # 소셜 로그인
   google_sign_in: ^6.2.1
 
-  # 기타 유틸 (iOS 문제 패키지들 제거)
+  # 기타 유틸
   intl: ^0.18.1
 
 dev_dependencies:

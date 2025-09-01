@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import '../../controllers/workplace_controller.dart';
+import '../../widgets/add_workplace_dialog.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../app/routes/app_routes.dart';
 
@@ -24,40 +26,200 @@ class HomeView extends GetView<WorkplaceController> {
           ),
         ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.business,
-              size: 64,
-              color: Theme.of(context).primaryColor.withOpacity(0.5),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              '등록된 사업장이 없습니다',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              '새로운 사업장을 추가해보세요',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
-            ),
-          ],
-        ),
+      body: RefreshIndicator(
+        onRefresh: controller.loadWorkplaces,
+        child: Obx(() {
+          if (controller.isLoading.value) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (controller.workplaces.isEmpty) {
+            return _buildEmptyState(context);
+          }
+
+          return _buildWorkplaceList();
+        }),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: 사업장 추가 페이지로 이동
-          Get.snackbar('알림', '사업장 추가 기능은 다음 단계에서 구현됩니다.');
-        },
+        onPressed: () => _showAddWorkplaceDialog(),
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.business,
+            size: 64,
+            color: Theme.of(context).primaryColor.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            '등록된 사업장이 없습니다',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '새로운 사업장을 추가해보세요',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWorkplaceList() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: controller.workplaces.length,
+      itemBuilder: (context, index) {
+        final workplace = controller.workplaces[index];
+        return Card(
+          child: ListTile(
+            leading: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Icon(
+                Icons.business,
+                color: Theme.of(context).primaryColor,
+              ),
+            ),
+            title: Text(
+              workplace.name,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+              ),
+            ),
+            subtitle: Text(
+              '생성일: ${DateFormat('yyyy.MM.dd').format(workplace.createdAt)}',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 12,
+              ),
+            ),
+            trailing: PopupMenuButton(
+              onSelected: (value) => _handleMenuSelection(value, workplace.id),
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('이름 수정'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 18, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('삭제', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            onTap: () {
+              // TODO: 사업장 세부 페이지로 이동 (다음 단계에서 구현)
+              Get.snackbar('알림', '사업장 세부 페이지는 다음 단계에서 구현됩니다.');
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddWorkplaceDialog() {
+    Get.dialog(AddWorkplaceDialog());
+  }
+
+  void _handleMenuSelection(String value, String workplaceId) {
+    switch (value) {
+      case 'edit':
+        _showEditWorkplaceDialog(workplaceId);
+        break;
+      case 'delete':
+        _showDeleteConfirmDialog(workplaceId);
+        break;
+    }
+  }
+
+  void _showEditWorkplaceDialog(String workplaceId) {
+    final workplace = controller.workplaces.firstWhere((w) => w.id == workplaceId);
+    final TextEditingController nameController = TextEditingController(text: workplace.name);
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('사업장 이름 수정'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            labelText: '사업장 이름',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = nameController.text.trim();
+              if (newName.isNotEmpty) {
+                await controller.updateWorkplaceName(workplaceId, newName);
+                Get.back();
+              }
+            },
+            child: const Text('수정'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmDialog(String workplaceId) {
+    final workplace = controller.workplaces.firstWhere((w) => w.id == workplaceId);
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('사업장 삭제'),
+        content: Text('\'${workplace.name}\' 사업장을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await controller.deleteWorkplace(workplaceId);
+              Get.back();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('삭제'),
+          ),
+        ],
       ),
     );
   }
