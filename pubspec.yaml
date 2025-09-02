@@ -27,6 +27,8 @@ dependencies:
 
   # 기타 유틸
   intl: ^0.18.1
+  image_picker: ^1.2.0
+  firebase_storage: ^12.4.10
 
 dev_dependencies:
   flutter_test:

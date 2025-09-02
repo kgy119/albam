@@ -37,7 +37,7 @@ class HomeView extends GetView<WorkplaceController> {
             return _buildEmptyState(context);
           }
 
-          return _buildWorkplaceList();
+          return _buildWorkplaceList(context);
         }),
       ),
       floatingActionButton: FloatingActionButton(
@@ -78,72 +78,152 @@ class HomeView extends GetView<WorkplaceController> {
     );
   }
 
-  Widget _buildWorkplaceList() {
+  Widget _buildWorkplaceList(BuildContext context) {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: controller.workplaces.length,
       itemBuilder: (context, index) {
         final workplace = controller.workplaces[index];
-        return Card(
-          child: ListTile(
-            leading: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Icon(
-                Icons.business,
-                color: Theme.of(context).primaryColor,
-              ),
-            ),
-            title: Text(
-              workplace.name,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-              ),
-            ),
-            subtitle: Text(
-              '생성일: ${DateFormat('yyyy.MM.dd').format(workplace.createdAt)}',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
-              ),
-            ),
-            trailing: PopupMenuButton(
-              onSelected: (value) => _handleMenuSelection(value, workplace.id),
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 18),
-                      SizedBox(width: 8),
-                      Text('이름 수정'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 18, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('삭제', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            onTap: () {
-              // TODO: 사업장 세부 페이지로 이동 (다음 단계에서 구현)
-              Get.snackbar('알림', '사업장 세부 페이지는 다음 단계에서 구현됩니다.');
-            },
-          ),
-        );
+        return _buildWorkplaceCard(workplace, context);
       },
+    );
+  }
+
+  Widget _buildWorkplaceCard(workplace, BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: () {
+          // 사업장 세부페이지로 이동
+          Get.toNamed(AppRoutes.workplaceDetail, arguments: workplace);
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.business,
+                      color: Theme.of(context).primaryColor,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          workplace.name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '생성일: ${DateFormat('yyyy.MM.dd').format(workplace.createdAt)}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuButton(
+                    onSelected: (value) => _handleMenuSelection(value, workplace.id),
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, size: 18),
+                            SizedBox(width: 8),
+                            Text('이름 수정'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, size: 18, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('삭제', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // 사업장 정보 요약
+              Row(
+                children: [
+                  _buildInfoChip(
+                    icon: Icons.people,
+                    label: '직원 0명', // TODO: 실제 직원 수로 교체
+                    color: Colors.blue,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildInfoChip(
+                    icon: Icons.schedule,
+                    label: '이번 달',
+                    color: Colors.green,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 14,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

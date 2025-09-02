@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
-import '../../data/models/workplace.dart';
+import '../../data/models/workplace_model.dart';
 import '../constants/app_constants.dart';
 import 'auth_service.dart';
 

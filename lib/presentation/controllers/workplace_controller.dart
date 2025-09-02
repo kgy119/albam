@@ -1,5 +1,5 @@
 import 'package:get/get.dart';
-import '../../data/models/workplace.dart';
+import '../../data/models/workplace_model.dart';
 import '../../core/services/workplace_service.dart';
 
 class WorkplaceController extends GetxController {

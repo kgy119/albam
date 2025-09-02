@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:get/get.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'firebase_options.dart'; // FlutterFire CLI로 생성된 파일
 import 'app/routes/app_pages.dart';
@@ -16,6 +17,8 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  await initializeDateFormatting('ko_KR', null);
 
   // 서비스 등록 (순서 중요)
   await Get.putAsync(() => AuthService().init());
@@ -38,10 +41,9 @@ class MyApp extends StatelessWidget {
       // 항상 로그인 화면으로 시작 (AuthController에서 자동 리디렉션 처리)
       initialRoute: AppRoutes.login,
       getPages: AppPages.routes,
-      // 네비게이션 관련 디버깅
-      routingCallback: (routing) {
-        print('Route changed: ${routing?.current}'); // 디버깅용
-      },
+      // 한국어 로케일 설정
+      locale: const Locale('ko', 'KR'),
+      fallbackLocale: const Locale('en', 'US'),
     );
   }
 }
