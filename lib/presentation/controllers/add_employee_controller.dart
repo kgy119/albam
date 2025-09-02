@@ -18,6 +18,9 @@ class AddEmployeeController extends GetxController {
   // 사업장 정보
   late Workplace workplace;
 
+  // 기존 직원 목록 (중복 확인용)
+  List<String> existingEmployeeNames = [];
+
   // 이미지 관련
   Rxn<File> selectedImage = Rxn<File>();
   final ImagePicker _picker = ImagePicker();
@@ -29,7 +32,20 @@ class AddEmployeeController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    workplace = Get.arguments as Workplace;
+
+    final arguments = Get.arguments;
+    if (arguments is Map<String, dynamic>) {
+      workplace = arguments['workplace'];
+      final existingEmployees = arguments['existingEmployees'] as List<dynamic>?;
+      if (existingEmployees != null) {
+        existingEmployeeNames = existingEmployees
+            .map((emp) => emp.name.toString().trim().toLowerCase())
+            .toList();
+      }
+    } else {
+      // 이전 방식과의 호환성
+      workplace = arguments as Workplace;
+    }
 
     // 기본 최저시급 설정 (2025년 기준 10,030원)
     wageController.text = '10030';
@@ -73,16 +89,38 @@ class AddEmployeeController extends GetxController {
     try {
       isImageUploading.value = true;
 
-      final fileName = 'contracts/${workplace.id}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      // 파일명을 고유하게 생성 (타임스탬프 + 랜덤)
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'contracts/${workplace.id}/${timestamp}_contract.jpg';
       final ref = FirebaseStorage.instance.ref().child(fileName);
 
-      await ref.putFile(selectedImage.value!);
+      // 메타데이터 설정
+      final metadata = SettableMetadata(
+        contentType: 'image/jpeg',
+        customMetadata: {
+          'workplaceId': workplace.id,
+          'uploadedAt': DateTime.now().toIso8601String(),
+        },
+      );
+
+      // 파일 업로드
+      final uploadTask = ref.putFile(selectedImage.value!, metadata);
+
+      // 업로드 진행률 모니터링 (선택사항)
+      uploadTask.snapshotEvents.listen((taskSnapshot) {
+        final progress = taskSnapshot.bytesTransferred / taskSnapshot.totalBytes;
+        print('업로드 진행률: ${(progress * 100).toInt()}%');
+      });
+
+      // 업로드 완료 대기
+      await uploadTask;
       final downloadUrl = await ref.getDownloadURL();
 
+      print('이미지 업로드 완료: $downloadUrl');
       return downloadUrl;
     } catch (e) {
       print('이미지 업로드 오류: $e');
-      Get.snackbar('오류', '이미지 업로드에 실패했습니다.');
+      Get.snackbar('오류', '이미지 업로드에 실패했습니다. 다시 시도해주세요.');
       return null;
     } finally {
       isImageUploading.value = false;
@@ -101,12 +139,13 @@ class AddEmployeeController extends GetxController {
       if (selectedImage.value != null) {
         contractImageUrl = await _uploadImage();
         if (contractImageUrl == null) {
+          // 이미지 업로드 실패시 중단
           isLoading.value = false;
-          return; // 이미지 업로드 실패시 중단
+          return;
         }
       }
 
-      // WorkplaceDetailController 찾기
+      // WorkplaceDetailController 찾기 및 직원 추가
       final workplaceController = Get.find<WorkplaceDetailController>();
 
       final success = await workplaceController.addEmployee(
@@ -117,11 +156,27 @@ class AddEmployeeController extends GetxController {
       );
 
       if (success) {
-        Get.back(); // 이전 화면으로 돌아가기
+        print('직원 추가 성공 - 화면 이동');
+
+        // 성공 결과와 직원 이름을 함께 반환
+        Get.back(result: {
+          'success': true,
+          'employeeName': nameController.text.trim(),
+        });
+
+      } else {
+        print('직원 추가 실패');
       }
+
     } catch (e) {
-      print('직원 추가 오류: $e');
-      Get.snackbar('오류', '직원 추가에 실패했습니다.');
+      print('직원 추가 예외 오류: $e');
+      Get.snackbar(
+        '오류',
+        '직원 추가 중 오류가 발생했습니다.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Get.theme.colorScheme.error,
+        colorText: Get.theme.colorScheme.onError,
+      );
     } finally {
       isLoading.value = false;
     }
@@ -145,6 +200,12 @@ class AddEmployeeController extends GetxController {
     if (value == null || value.trim().isEmpty) {
       return '이름을 입력해주세요';
     }
+
+    // 기존 직원 이름과 중복 확인
+    if (existingEmployeeNames.contains(value.trim().toLowerCase())) {
+      return '이미 등록된 직원 이름입니다';
+    }
+
     return null;
   }
 

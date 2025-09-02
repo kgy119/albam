@@ -65,6 +65,10 @@ class AddEmployeeView extends GetView<AddEmployeeController> {
             prefixIcon: Icon(Icons.person),
           ),
           textInputAction: TextInputAction.next,
+          onChanged: (value) {
+            // 실시간 유효성 검사를 위해 폼 상태 업데이트
+            controller.formKey.currentState?.validate();
+          },
         ),
       ],
     );
@@ -102,6 +106,9 @@ class AddEmployeeView extends GetView<AddEmployeeController> {
                 TextPosition(offset: controller.phoneController.text.length),
               );
             }
+
+            // 실시간 유효성 검사를 위해 폼 상태 업데이트
+            controller.formKey.currentState?.validate();
           },
           textInputAction: TextInputAction.next,
         ),
@@ -136,6 +143,10 @@ class AddEmployeeView extends GetView<AddEmployeeController> {
             suffixText: '원',
             helperText: '2025년 최저시급: ${currencyFormatter.format(10030)}원',
           ),
+          onChanged: (value) {
+            // 실시간 유효성 검사
+            controller.formKey.currentState?.validate();
+          },
           textInputAction: TextInputAction.done,
         ),
       ],
@@ -281,7 +292,11 @@ class AddEmployeeView extends GetView<AddEmployeeController> {
               ),
             ),
             const SizedBox(width: 12),
-            Text(controller.isImageUploading.value ? '이미지 업로드 중...' : '직원 추가 중...'),
+            Text(
+              controller.isImageUploading.value
+                  ? '근로계약서 업로드 중...'
+                  : '직원 등록 중...',
+            ),
           ],
         )
             : const Text(

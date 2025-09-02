@@ -34,8 +34,33 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
         );
       }),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Get.toNamed(AppRoutes.addEmployee, arguments: controller.workplace);
+        onPressed: () async {
+          final result = await Get.toNamed(
+            AppRoutes.addEmployee,
+            arguments: {
+              'workplace': controller.workplace,
+              'existingEmployees': controller.employees.toList(),
+            },
+          );
+
+          // 직원 추가 성공시 처리
+          if (result != null && result['success'] == true) {
+            print('직원 추가 성공 - 목록 새로고침 및 스낵바 표시');
+
+            // 목록 새로고침
+            await controller.loadEmployees();
+
+            // 성공 스낵바 표시
+            Get.snackbar(
+              '완료',
+              '${result['employeeName']} 직원이 성공적으로 등록되었습니다.',
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: Colors.green,
+              colorText: Colors.white,
+              duration: const Duration(seconds: 3),
+              margin: const EdgeInsets.all(10),
+            );
+          }
         },
         child: const Icon(Icons.person_add),
       ),

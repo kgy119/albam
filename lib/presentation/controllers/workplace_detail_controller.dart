@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../data/models/workplace_model.dart';
@@ -66,6 +67,8 @@ class WorkplaceDetailController extends GetxController {
     String? contractImageUrl,
   }) async {
     try {
+      print('직원 추가 시작: $name');
+
       final now = DateTime.now();
       final employeeData = {
         'workplaceId': workplace.id,
@@ -81,12 +84,23 @@ class WorkplaceDetailController extends GetxController {
           .collection(AppConstants.employeesCollection)
           .add(employeeData);
 
+      print('Firestore 저장 완료');
+
+      // 직원 목록 새로고침
       await loadEmployees();
-      Get.snackbar('성공', '직원이 추가되었습니다.');
+
+      print('직원 목록 새로고침 완료');
+
       return true;
     } catch (e) {
       print('직원 추가 오류: $e');
-      Get.snackbar('오류', '직원 추가에 실패했습니다.');
+      Get.snackbar(
+        '오류',
+        '직원 등록에 실패했습니다. 다시 시도해주세요.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Get.theme.colorScheme.error,
+        colorText: Get.theme.colorScheme.onError,
+      );
       return false;
     }
   }
