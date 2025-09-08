@@ -58,6 +58,7 @@ ios/firebase_app_id_file.json
 
 # iOS 관련 민감한 파일들
 ios/Runner/GoogleService-Info.plist
+ios/Runner/Info.plist
 ios/Runner/Info.plist.backup
 ios/Runner/firebase_app_id_file.json
 
