@@ -31,8 +31,15 @@ class WorkplaceDetailController extends GetxController {
   void onInit() {
     super.onInit();
     workplace = Get.arguments as Workplace;
+
+    // 초기 데이터 로드
     loadEmployees();
     loadMonthlySchedules();
+
+    // 월 변경시 스케줄 다시 로드되도록 리스너 추가
+    ever(selectedDate, (date) {
+      loadMonthlySchedules();
+    });
   }
 
   /// 직원 목록 로드
@@ -119,14 +126,14 @@ class WorkplaceDetailController extends GetxController {
     try {
       print('직원 수정 시작: $name');
 
-      final updateData = {
+      final updateData = <String, dynamic>{
         'name': name,
         'phoneNumber': phoneNumber,
         'hourlyWage': hourlyWage,
         'updatedAt': Timestamp.fromDate(DateTime.now()),
       };
 
-      // contractImageUrl이 변경된 경우만 업데이트
+      // contractImageUrl이 제공된 경우만 업데이트
       if (contractImageUrl != null) {
         updateData['contractImageUrl'] = contractImageUrl;
       }
@@ -141,24 +148,38 @@ class WorkplaceDetailController extends GetxController {
       // 직원 목록 새로고침
       await loadEmployees();
 
-      Get.snackbar(
-        '성공',
-        '직원 정보가 수정되었습니다.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-
       return true;
     } catch (e) {
       print('직원 수정 오류: $e');
       Get.snackbar(
         '오류',
-        '직원 정보 수정에 실패했습니다.',
+        '직원 정보 수정에 실패했습니다: ${e.toString()}',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Get.theme.colorScheme.error,
         colorText: Get.theme.colorScheme.onError,
+        duration: const Duration(seconds: 4),
       );
       return false;
     }
+  }
+
+  /// 전화번호 포맷팅
+  String formatPhoneNumber(String phone) {
+    // 숫자만 추출
+    String numbers = phone.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (numbers.length == 11) {
+      // 010-1234-5678 형태로 포맷팅
+      return '${numbers.substring(0, 3)}-${numbers.substring(3, 7)}-${numbers.substring(7)}';
+    }
+
+    return phone;
+  }
+
+  /// 전화번호 유효성 검사
+  bool validatePhoneNumber(String phone) {
+    String numbers = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    return numbers.length == 11 && numbers.startsWith('010');
   }
 
   /// 직원 삭제
@@ -227,14 +248,32 @@ class WorkplaceDetailController extends GetxController {
 
     double totalHours = 0;
     for (var schedule in monthlySchedules) {
-      if (schedule.date.year == targetDate.year &&
-          schedule.date.month == targetDate.month &&
-          schedule.date.day == targetDate.day) {
+      final scheduleDate = DateTime(
+          schedule.date.year,
+          schedule.date.month,
+          schedule.date.day
+      );
+
+      if (scheduleDate.isAtSameMomentAs(targetDate)) {
         totalHours += schedule.totalMinutes / 60.0;
       }
     }
 
     return totalHours;
+  }
+
+  /// 특정 날짜의 스케줄 목록 반환
+  List<Schedule> getDaySchedules(int day) {
+    final targetDate = DateTime(selectedDate.value.year, selectedDate.value.month, day);
+
+    return monthlySchedules.where((schedule) {
+      final scheduleDate = DateTime(
+          schedule.date.year,
+          schedule.date.month,
+          schedule.date.day
+      );
+      return scheduleDate.isAtSameMomentAs(targetDate);
+    }).toList();
   }
 
   /// 월 변경
@@ -260,22 +299,5 @@ class WorkplaceDetailController extends GetxController {
   int getFirstDayOfWeek() {
     final firstDay = DateTime(selectedDate.value.year, selectedDate.value.month, 1);
     return firstDay.weekday;
-  }
-
-  /// 전화번호 포맷팅
-  String formatPhoneNumber(String phone) {
-    String numbers = phone.replaceAll(RegExp(r'[^0-9]'), '');
-
-    if (numbers.length == 11) {
-      return '${numbers.substring(0, 3)}-${numbers.substring(3, 7)}-${numbers.substring(7)}';
-    }
-
-    return phone;
-  }
-
-  /// 전화번호 유효성 검사
-  bool validatePhoneNumber(String phone) {
-    String numbers = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    return numbers.length == 11 && numbers.startsWith('010');
   }
 }

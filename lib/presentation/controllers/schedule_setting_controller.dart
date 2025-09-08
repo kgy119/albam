@@ -187,6 +187,387 @@ class ScheduleSettingController extends GetxController {
     );
   }
 
+  /// 스케줄 수정
+  Future<void> updateSchedule({
+    required String scheduleId,
+    required String employeeId,
+    required TimeOfDay startTime,
+    required TimeOfDay endTime,
+  }) async {
+    try {
+      // 직원 정보 찾기
+      final employee = employees.firstWhere((e) => e.id == employeeId);
+
+      // DateTime 객체 생성
+      final startDateTime = DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        startTime.hour,
+        startTime.minute,
+      );
+
+      final endDateTime = DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        endTime.hour,
+        endTime.minute,
+      );
+
+      // 종료시간이 시작시간보다 이른 경우 다음날로 설정
+      final actualEndDateTime = endDateTime.isBefore(startDateTime)
+          ? endDateTime.add(const Duration(days: 1))
+          : endDateTime;
+
+      // 총 근무시간 계산 (분 단위)
+      final totalMinutes = Schedule.calculateTotalMinutes(startDateTime, actualEndDateTime);
+
+      if (totalMinutes <= 0) {
+        Get.snackbar('오류', '종료시간이 시작시간보다 늦어야 합니다.');
+        return;
+      }
+
+      final updateData = {
+        'employeeId': employeeId,
+        'employeeName': employee.name,
+        'startTime': Timestamp.fromDate(startDateTime),
+        'endTime': Timestamp.fromDate(actualEndDateTime),
+        'totalMinutes': totalMinutes,
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      };
+
+      await _firestore
+          .collection(AppConstants.schedulesCollection)
+          .doc(scheduleId)
+          .update(updateData);
+
+      await loadSchedules(); // 목록 새로고침
+      Get.snackbar('성공', '스케줄이 수정되었습니다.');
+    } catch (e) {
+      print('스케줄 수정 오류: $e');
+      Get.snackbar('오류', '스케줄 수정에 실패했습니다.');
+    }
+  }
+
+  /// 스케줄 수정 다이얼로그 표시
+  void showEditScheduleDialog(schedule) {
+    if (employees.isEmpty) {
+      Get.snackbar('알림', '등록된 직원이 없습니다.');
+      return;
+    }
+
+    String? selectedEmployeeId = schedule.employeeId;
+    TimeOfDay? startTime = TimeOfDay(
+      hour: schedule.startTime.hour,
+      minute: schedule.startTime.minute,
+    );
+    TimeOfDay? endTime = TimeOfDay(
+      hour: schedule.endTime.hour,
+      minute: schedule.endTime.minute,
+    );
+
+    Get.dialog(
+      StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: Text('${selectedDate.month}/${selectedDate.day} 스케줄 수정'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 직원 선택
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: '직원 선택',
+                    border: OutlineInputBorder(),
+                  ),
+                  value: selectedEmployeeId,
+                  items: employees
+                      .map((employee) => DropdownMenuItem(
+                    value: employee.id,
+                    child: Text(employee.name),
+                  ))
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedEmployeeId = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // 시작 시간 선택
+                ListTile(
+                  title: const Text('시작 시간'),
+                  subtitle: Text(startTime?.format(context) ?? '선택해주세요'),
+                  trailing: const Icon(Icons.access_time),
+                  onTap: () async {
+                    final time = await selectTime(context, initialTime: startTime);
+                    if (time != null) {
+                      setState(() {
+                        startTime = time;
+                      });
+                    }
+                  },
+                ),
+
+                // 종료 시간 선택
+                ListTile(
+                  title: const Text('종료 시간'),
+                  subtitle: Text(endTime?.format(context) ?? '선택해주세요'),
+                  trailing: const Icon(Icons.access_time),
+                  onTap: () async {
+                    final time = await selectTime(context, initialTime: endTime);
+                    if (time != null) {
+                      setState(() {
+                        endTime = time;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('취소'),
+              ),
+              ElevatedButton(
+                onPressed: selectedEmployeeId != null && startTime != null && endTime != null
+                    ? () async {
+                  Get.back();
+                  await updateSchedule(
+                    scheduleId: schedule.id,
+                    employeeId: selectedEmployeeId!,
+                    startTime: startTime!,
+                    endTime: endTime!,
+                  );
+                }
+                    : null,
+                child: const Text('수정'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// 해당 월의 스케줄이 있는 날짜들 조회
+  Future<List<DateTime>> getScheduleDates() async {
+    try {
+      final startOfMonth = DateTime(selectedDate.year, selectedDate.month, 1);
+      final endOfMonth = DateTime(selectedDate.year, selectedDate.month + 1, 1);
+
+      final querySnapshot = await _firestore
+          .collection(AppConstants.schedulesCollection)
+          .where('workplaceId', isEqualTo: workplace.id)
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
+          .where('date', isLessThan: Timestamp.fromDate(endOfMonth))
+          .get();
+
+      // 중복 제거를 위해 Set 사용
+      Set<DateTime> uniqueDates = {};
+
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final date = (data['date'] as Timestamp).toDate();
+        final dateOnly = DateTime(date.year, date.month, date.day);
+        uniqueDates.add(dateOnly);
+      }
+
+      List<DateTime> sortedDates = uniqueDates.toList()
+        ..sort((a, b) => b.compareTo(a)); // 최신 날짜부터
+
+      return sortedDates;
+    } catch (e) {
+      print('스케줄 날짜 조회 오류: $e');
+      return [];
+    }
+  }
+
+  /// 특정 날짜의 스케줄 조회
+  Future<List<Schedule>> getSchedulesByDate(DateTime targetDate) async {
+    try {
+      final startOfDay = DateTime(targetDate.year, targetDate.month, targetDate.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      final querySnapshot = await _firestore
+          .collection(AppConstants.schedulesCollection)
+          .where('workplaceId', isEqualTo: workplace.id)
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+          .where('date', isLessThan: Timestamp.fromDate(endOfDay))
+          .orderBy('startTime')
+          .get();
+
+      return querySnapshot.docs
+          .map((doc) => Schedule.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      print('특정 날짜 스케줄 조회 오류: $e');
+      return [];
+    }
+  }
+
+  /// 다른 날짜에서 스케줄 복사
+  Future<void> copySchedulesFromDate(DateTime sourceDate) async {
+    try {
+      isSaving.value = true;
+
+      // 복사할 스케줄 조회
+      final sourceSchedules = await getSchedulesByDate(sourceDate);
+
+      if (sourceSchedules.isEmpty) {
+        Get.snackbar('알림', '선택한 날짜에 복사할 스케줄이 없습니다.');
+        return;
+      }
+
+      final batch = _firestore.batch();
+      final now = DateTime.now();
+
+      for (var sourceSchedule in sourceSchedules) {
+        // 새로운 날짜로 시간 설정
+        final newStartTime = DateTime(
+          selectedDate.year,
+          selectedDate.month,
+          selectedDate.day,
+          sourceSchedule.startTime.hour,
+          sourceSchedule.startTime.minute,
+        );
+
+        final newEndTime = DateTime(
+          selectedDate.year,
+          selectedDate.month,
+          selectedDate.day,
+          sourceSchedule.endTime.hour,
+          sourceSchedule.endTime.minute,
+        );
+
+        // 종료시간이 다음날인 경우 처리
+        final actualEndTime = newEndTime.isBefore(newStartTime)
+            ? newEndTime.add(const Duration(days: 1))
+            : newEndTime;
+
+        final newScheduleData = {
+          'workplaceId': workplace.id,
+          'employeeId': sourceSchedule.employeeId,
+          'employeeName': sourceSchedule.employeeName,
+          'date': Timestamp.fromDate(selectedDate),
+          'startTime': Timestamp.fromDate(newStartTime),
+          'endTime': Timestamp.fromDate(actualEndTime),
+          'totalMinutes': sourceSchedule.totalMinutes,
+          'createdAt': Timestamp.fromDate(now),
+          'updatedAt': Timestamp.fromDate(now),
+        };
+
+        // 새 문서 참조 생성
+        final newDocRef = _firestore.collection(AppConstants.schedulesCollection).doc();
+        batch.set(newDocRef, newScheduleData);
+      }
+
+      await batch.commit();
+      await loadSchedules(); // 목록 새로고침
+
+      Get.snackbar(
+        '성공',
+        '${sourceDate.month}/${sourceDate.day}일 스케줄이 복사되었습니다. (${sourceSchedules.length}개)',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+
+    } catch (e) {
+      print('스케줄 복사 오류: $e');
+      Get.snackbar('오류', '스케줄 복사에 실패했습니다.');
+    } finally {
+      isSaving.value = false;
+    }
+  }
+
+  /// 스케줄 복사 다이얼로그 표시
+  void showCopyScheduleDialog() async {
+    final scheduleDates = await getScheduleDates();
+
+    if (scheduleDates.isEmpty) {
+      Get.snackbar('알림', '이번 달에 등록된 스케줄이 없습니다.');
+      return;
+    }
+
+    // 현재 날짜 제외
+    final currentDate = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+    scheduleDates.removeWhere((date) => date.isAtSameMomentAs(currentDate));
+
+    if (scheduleDates.isEmpty) {
+      Get.snackbar('알림', '복사할 수 있는 다른 날짜의 스케줄이 없습니다.');
+      return;
+    }
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('스케줄 복사'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('복사할 날짜를 선택하세요:'),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 300,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: scheduleDates.length,
+                  itemBuilder: (context, index) {
+                    final date = scheduleDates[index];
+                    return FutureBuilder<List<Schedule>>(
+                      future: getSchedulesByDate(date),
+                      builder: (context, snapshot) {
+                        final schedules = snapshot.data ?? [];
+                        final totalHours = schedules.fold<double>(
+                            0, (sum, schedule) => sum + (schedule.totalMinutes / 60.0)
+                        );
+
+                        return Card(
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Theme.of(Get.context!).primaryColor,
+                              child: Text(
+                                '${date.day}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            title: Text('${date.month}/${date.day}일'),
+                            subtitle: Text(
+                              '${schedules.length}개 스케줄 • ${totalHours.toStringAsFixed(1)}시간',
+                            ),
+                            trailing: const Icon(Icons.copy),
+                            onTap: () async {
+                              Get.back();
+                              await copySchedulesFromDate(date);
+                            },
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 스케줄 추가 다이얼로그 표시
   void showAddScheduleDialog() {
     if (employees.isEmpty) {

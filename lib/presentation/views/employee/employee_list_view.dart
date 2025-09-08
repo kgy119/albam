@@ -144,7 +144,9 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
                 ),
                 PopupMenuButton(
                   onSelected: (value) {
-                    if (value == 'delete') {
+                    if (value == 'edit') {
+                      _showEditDialog(employee);
+                    } else if (value == 'delete') {
                       _showDeleteDialog(employee);
                     } else if (value == 'salary') {
                       // TODO: 급여 조회 페이지로 이동
@@ -158,6 +160,16 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
                     }
                   },
                   itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit),
+                          SizedBox(width: 8),
+                          Text('정보 수정'),
+                        ],
+                      ),
+                    ),
                     const PopupMenuItem(
                       value: 'salary',
                       child: Row(
@@ -260,5 +272,132 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
         ],
       ),
     );
+  }
+
+  void _showEditDialog(employee) {
+    final nameController = TextEditingController(text: employee.name);
+    final phoneController = TextEditingController(text: employee.phoneNumber);
+    final wageController = TextEditingController(text: employee.hourlyWage.toString());
+    final formKey = GlobalKey<FormState>();
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('직원 정보 수정'),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 이름 입력
+                TextFormField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: '이름',
+                    prefixIcon: Icon(Icons.person),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return '이름을 입력해주세요';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // 전화번호 입력
+                TextFormField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(
+                    labelText: '전화번호',
+                    prefixIcon: Icon(Icons.phone),
+                  ),
+                  keyboardType: TextInputType.phone,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return '전화번호를 입력해주세요';
+                    }
+                    String numbers = value.replaceAll(RegExp(r'[^0-9]'), '');
+                    if (numbers.length != 11 || !numbers.startsWith('010')) {
+                      return '올바른 전화번호를 입력해주세요 (010-XXXX-XXXX)';
+                    }
+                    return null;
+                  },
+                  onChanged: (value) {
+                    if (value.length == 11) {
+                      phoneController.text = controller.formatPhoneNumber(value);
+                      phoneController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: phoneController.text.length),
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // 시급 입력
+                TextFormField(
+                  controller: wageController,
+                  decoration: const InputDecoration(
+                    labelText: '시급',
+                    prefixIcon: Icon(Icons.monetization_on),
+                    suffixText: '원',
+                    helperText: '2025년 최저시급: 10,030원',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return '시급을 입력해주세요';
+                    }
+                    final wage = int.tryParse(value.trim());
+                    if (wage == null || wage < 10030) {
+                      return '최저시급(10,030원) 이상을 입력해주세요';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState!.validate()) {
+                Get.back();
+
+                final success = await controller.updateEmployee(
+                  employeeId: employee.id,
+                  name: nameController.text.trim(),
+                  phoneNumber: controller.formatPhoneNumber(phoneController.text.trim()),
+                  hourlyWage: int.parse(wageController.text.trim()),
+                );
+
+                if (success) {
+                  Get.snackbar(
+                    '완료',
+                    '${nameController.text.trim()} 직원 정보가 수정되었습니다.',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.green,
+                    colorText: Colors.white,
+                  );
+                }
+              }
+            },
+            child: const Text('수정'),
+          ),
+        ],
+      ),
+    );
+
+    // 메모리 정리
+    Future.delayed(const Duration(seconds: 1), () {
+      nameController.dispose();
+      phoneController.dispose();
+      wageController.dispose();
+    });
   }
 }

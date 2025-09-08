@@ -14,6 +14,14 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
           '${controller.selectedDate.month}월 ${controller.selectedDate.day}일 스케줄',
         ),
         actions: [
+          // 복사 버튼
+          IconButton(
+            icon: const Icon(Icons.copy),
+            onPressed: () => controller.showCopyScheduleDialog(),
+            tooltip: '다른 날 복사',
+          ),
+
+          // 총 근무시간 표시
           Obx(() => Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Center(
@@ -39,40 +47,109 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
 
         return _buildScheduleList();
       }),
-      floatingActionButton: FloatingActionButton(
-        onPressed: controller.showAddScheduleDialog,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: Obx(() => FloatingActionButton(
+        onPressed: controller.isSaving.value
+            ? null
+            : controller.showAddScheduleDialog,
+        child: controller.isSaving.value
+            ? const SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(
+            color: Colors.white,
+            strokeWidth: 2,
+          ),
+        )
+            : const Icon(Icons.add),
+      )),
     );
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.schedule,
-            size: 64,
-            color: Theme.of(Get.context!).primaryColor.withOpacity(0.5),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            '등록된 스케줄이 없습니다',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 80), // 플로팅버튼 여백
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.schedule,
+              size: 64,
+              color: Theme.of(Get.context!).primaryColor.withOpacity(0.5),
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '직원의 근무시간을 추가해보세요',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey,
+            const SizedBox(height: 16),
+            const Text(
+              '등록된 스케줄이 없습니다',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            const Text(
+              '직원의 근무시간을 추가해보세요',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // 버튼들
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // 새로 추가 버튼
+                ElevatedButton.icon(
+                  onPressed: () => controller.showAddScheduleDialog(),
+                  icon: const Icon(Icons.add),
+                  label: const Text('새로 추가'),
+                ),
+
+                const SizedBox(width: 16),
+
+                // 복사하기 버튼
+                OutlinedButton.icon(
+                  onPressed: () => controller.showCopyScheduleDialog(),
+                  icon: const Icon(Icons.copy),
+                  label: const Text('다른 날 복사'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(Get.context!).primaryColor,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // 안내 텍스트
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.symmetric(horizontal: 32),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.lightbulb_outline,
+                      color: Colors.blue[700], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '팁: 비슷한 스케줄이 있는 날짜에서 복사하면 시간을 절약할 수 있어요!',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -86,7 +163,7 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
         // 스케줄 목록
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), // 하단에 플로팅버튼 여백 추가
             itemCount: controller.schedules.length,
             itemBuilder: (context, index) {
               final schedule = controller.schedules[index];
@@ -191,12 +268,39 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
                   ),
                 ),
 
-                // 삭제 버튼
+                // 수정/삭제 버튼
                 const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                  onPressed: () => _showDeleteDialog(schedule),
-                  tooltip: '삭제',
+                PopupMenuButton(
+                  icon: const Icon(Icons.more_vert, size: 20),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      controller.showEditScheduleDialog(schedule);
+                    } else if (value == 'delete') {
+                      _showDeleteDialog(schedule);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 18),
+                          SizedBox(width: 8),
+                          Text('수정'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, color: Colors.red, size: 18),
+                          SizedBox(width: 8),
+                          Text('삭제', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -247,20 +351,52 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
     Get.dialog(
       AlertDialog(
         title: const Text('스케줄 삭제'),
-        content: Text(
-          '${schedule.employeeName}의 ${schedule.timeRangeString} 스케줄을 삭제하시겠습니까?',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('다음 스케줄을 삭제하시겠습니까?'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '직원: ${schedule.employeeName}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text('시간: ${schedule.timeRangeString}'),
+                  Text('근무: ${schedule.workTimeString}'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '이 작업은 되돌릴 수 없습니다.',
+              style: TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Get.back(),
             child: const Text('취소'),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
               Get.back();
               controller.deleteSchedule(schedule.id);
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('삭제'),
           ),
         ],

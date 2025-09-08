@@ -145,11 +145,13 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
 
     return Obx(() {
       final isSelected = controller.selectedDay.value == day;
+      final dayTotalHours = controller.getDayTotalHours(day);
+      final hasSchedule = dayTotalHours > 0;
 
       return GestureDetector(
-        onTap: () {
-          // TODO: 해당 날짜의 스케줄 설정 페이지로 이동
-          Get.toNamed(
+        onTap: () async {
+          // 스케줄 설정 화면으로 이동하고 결과를 기다림
+          await Get.toNamed(
             AppRoutes.scheduleSetting,
             arguments: {
               'workplace': controller.workplace,
@@ -160,6 +162,9 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
               ),
             },
           );
+
+          // 돌아왔을 때 스케줄 데이터 새로고침
+          controller.loadMonthlySchedules();
         },
         child: Container(
           decoration: BoxDecoration(
@@ -167,11 +172,13 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
                 ? Theme.of(Get.context!).primaryColor
                 : isToday
                 ? Theme.of(Get.context!).primaryColor.withOpacity(0.3)
+                : hasSchedule
+                ? Colors.green.withOpacity(0.1)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: Colors.grey[300]!,
-              width: 1,
+              color: hasSchedule ? Colors.green : Colors.grey[300]!,
+              width: hasSchedule ? 2 : 1,
             ),
           ),
           child: Column(
@@ -183,21 +190,25 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
                   fontWeight: FontWeight.bold,
                   color: isSelected || isToday
                       ? Colors.white
+                      : hasSchedule
+                      ? Colors.green[700]
                       : Colors.black87,
                 ),
               ),
 
-              // TODO: 해당 날짜의 총 근무시간 표시
+              // 해당 날짜의 총 근무시간 표시
               const SizedBox(height: 2),
-              Text(
-                '8h', // 임시 데이터
-                style: TextStyle(
-                  fontSize: 10,
-                  color: isSelected || isToday
-                      ? Colors.white70
-                      : Colors.grey[600],
+              if (hasSchedule)
+                Text(
+                  '${dayTotalHours.toStringAsFixed(1)}h',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w500,
+                    color: isSelected || isToday
+                        ? Colors.white70
+                        : Colors.green[600],
+                  ),
                 ),
-              ),
             ],
           ),
         ),

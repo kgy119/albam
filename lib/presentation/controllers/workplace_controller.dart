@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
 import '../../data/models/workplace_model.dart';
 import '../../core/services/workplace_service.dart';
@@ -35,24 +36,27 @@ class WorkplaceController extends GetxController {
   /// 사업장 목록 로드
   Future<void> loadWorkplaces() async {
     try {
-      print('사업장 목록 로드 시작'); // 디버깅용
+      print('사업장 목록 로드 시작');
       isLoading.value = true;
 
       final List<Workplace> loadedWorkplaces = await _workplaceService.getWorkplaces();
       workplaces.value = loadedWorkplaces;
 
-      print('사업장 목록 로드 완료: ${workplaces.length}개'); // 디버깅용
+      print('사업장 목록 로드 완료: ${workplaces.length}개');
+
+      // 직원 수도 함께 로드
+      await loadAllEmployeeCounts();
 
       if (workplaces.isEmpty) {
-        print('등록된 사업장이 없습니다.'); // 디버깅용
+        print('등록된 사업장이 없습니다.');
       }
 
     } catch (e) {
-      print('사업장 목록 로드 실패: $e'); // 디버깅용
+      print('사업장 목록 로드 실패: $e');
       Get.snackbar(
         '오류',
         e.toString(),
-        duration: const Duration(seconds: 5), // 길게 표시하여 오류 내용 확인
+        duration: const Duration(seconds: 5),
       );
     } finally {
       isLoading.value = false;
@@ -97,5 +101,40 @@ class WorkplaceController extends GetxController {
     } catch (e) {
       Get.snackbar('오류', e.toString());
     }
+  }
+
+  // 사업장별 직원 수 저장
+  RxMap<String, int> employeeCountMap = <String, int>{}.obs;
+
+  /// 모든 사업장의 직원 수 조회
+  Future<void> loadAllEmployeeCounts() async {
+    try {
+      for (var workplace in workplaces) {
+        final count = await _getEmployeeCount(workplace.id);
+        employeeCountMap[workplace.id] = count;
+      }
+    } catch (e) {
+      print('직원 수 조회 오류: $e');
+    }
+  }
+
+  /// 특정 사업장의 직원 수 조회
+  Future<int> _getEmployeeCount(String workplaceId) async {
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('employees')
+          .where('workplaceId', isEqualTo: workplaceId)
+          .get();
+
+      return querySnapshot.docs.length;
+    } catch (e) {
+      print('사업장 $workplaceId 직원 수 조회 오류: $e');
+      return 0;
+    }
+  }
+
+  /// 특정 사업장의 직원 수 반환
+  int getEmployeeCount(String workplaceId) {
+    return employeeCountMap[workplaceId] ?? 0;
   }
 }

@@ -172,20 +172,21 @@ class HomeView extends GetView<WorkplaceController> {
               const SizedBox(height: 12),
 
               // 사업장 정보 요약
-              Row(
-                children: [
-                  _buildInfoChip(
-                    icon: Icons.people,
-                    label: '직원 0명', // TODO: 실제 직원 수로 교체
-                    color: Colors.blue,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildInfoChip(
-                    icon: Icons.schedule,
-                    label: '이번 달',
-                    color: Colors.green,
-                  ),
-                ],
+              Obx(() => Row(
+                  children: [
+                    _buildInfoChip(
+                      icon: Icons.people,
+                      label: '직원 ${controller.getEmployeeCount(workplace.id)}명',
+                      color: Colors.blue,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildInfoChip(
+                      icon: Icons.schedule,
+                      label: '이번 달',
+                      color: Colors.green,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
