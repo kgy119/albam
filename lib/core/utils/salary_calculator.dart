@@ -2,7 +2,7 @@ import '../../data/models/schedule_model.dart';
 import '../constants/app_constants.dart';
 
 class SalaryCalculator {
-  /// 월 급여 계산 (일용직: 기본급 + 주휴수당)
+  /// 월 급여 계산 (일용직: 기본급 + 주휴수당 - 세금)
   static Map<String, dynamic> calculateMonthlySalary({
     required List<Schedule> schedules,
     required double hourlyWage,
@@ -38,17 +38,23 @@ class SalaryCalculator {
     double weeklyHolidayPay = weeklyHolidayHours * hourlyWage;
     double totalPay = basicPay + weeklyHolidayPay;
 
+    // 세금 계산 (3.3%)
+    double tax = totalPay * 0.033;
+    double netPay = totalPay - tax;
+
     return {
       'totalHours': totalHours,
       'weeklyHolidayHours': weeklyHolidayHours,
       'basicPay': basicPay,
       'weeklyHolidayPay': weeklyHolidayPay,
       'totalPay': totalPay,
+      'tax': tax,
+      'netPay': netPay,
       'weeklyBreakdown': _getWeeklyBreakdown(weeklySchedules),
     };
   }
 
-  /// 주휴수당 시간 계산
+  /// 주휴수당 시간 계산 (수정된 버전)
   static double _calculateWeeklyHolidayHours(
       Map<int, Map<DateTime, double>> weeklySchedules) {
     double totalWeeklyHolidayHours = 0;
@@ -64,11 +70,9 @@ class SalaryCalculator {
 
       // 주 15시간 이상 근무 시 주휴수당 지급
       if (weekTotalHours >= AppConstants.weeklyHolidayMinHours && workDays > 0) {
-        double holidayHours = weekTotalHours / workDays;
-        // 최대 8시간 제한
-        if (holidayHours > AppConstants.weeklyHolidayMaxHours) {
-          holidayHours = AppConstants.weeklyHolidayMaxHours.toDouble();
-        }
+        // 주휴수당은 일평균 근로시간 (최대 8시간)
+        double dailyAverage = weekTotalHours / workDays;
+        double holidayHours = dailyAverage > 8 ? 8 : dailyAverage;
         totalWeeklyHolidayHours += holidayHours;
       }
     });

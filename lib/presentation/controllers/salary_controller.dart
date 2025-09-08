@@ -11,6 +11,27 @@ class SalaryController extends GetxController {
   RxBool isLoading = false.obs;
   Rxn<Map<String, dynamic>> salaryData = Rxn<Map<String, dynamic>>();
 
+  @override
+  void onInit() {
+    super.onInit();
+
+    // Get.arguments로 전달받은 데이터 자동 처리
+    final arguments = Get.arguments as Map<String, dynamic>?;
+    if (arguments != null) {
+      final employee = arguments['employee'];
+      final year = arguments['year'];
+      final month = arguments['month'];
+
+      if (employee != null && year != null && month != null) {
+        calculateEmployeeSalary(
+          employee: employee,
+          year: year,
+          month: month,
+        );
+      }
+    }
+  }
+
   /// 직원의 월별 급여 계산
   Future<void> calculateEmployeeSalary({
     required Employee employee,

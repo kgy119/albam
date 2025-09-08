@@ -149,14 +149,7 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
                     } else if (value == 'delete') {
                       _showDeleteDialog(employee);
                     } else if (value == 'salary') {
-                      // TODO: 급여 조회 페이지로 이동
-                      Get.toNamed(
-                        AppRoutes.salaryView,
-                        arguments: {
-                          'employee': employee,
-                          'workplace': controller.workplace,
-                        },
-                      );
+                      _showSalaryDialog(employee);
                     }
                   },
                   itemBuilder: (context) => [
@@ -399,5 +392,80 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
       phoneController.dispose();
       wageController.dispose();
     });
+  }
+
+  void _showSalaryDialog(employee) {
+    final now = DateTime.now();
+    int selectedYear = now.year;
+    int selectedMonth = now.month;
+
+    Get.dialog(
+      AlertDialog(
+        title: Text('${employee.name} 급여 조회'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 년도 선택
+            DropdownButtonFormField<int>(
+              decoration: const InputDecoration(
+                labelText: '년도',
+                border: OutlineInputBorder(),
+              ),
+              value: selectedYear,
+              items: List.generate(5, (index) {
+                final year = now.year - 2 + index;
+                return DropdownMenuItem(
+                  value: year,
+                  child: Text('$year년'),
+                );
+              }),
+              onChanged: (value) {
+                selectedYear = value!;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // 월 선택
+            DropdownButtonFormField<int>(
+              decoration: const InputDecoration(
+                labelText: '월',
+                border: OutlineInputBorder(),
+              ),
+              value: selectedMonth,
+              items: List.generate(12, (index) {
+                final month = index + 1;
+                return DropdownMenuItem(
+                  value: month,
+                  child: Text('$month월'),
+                );
+              }),
+              onChanged: (value) {
+                selectedMonth = value!;
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              Get.toNamed(
+                AppRoutes.salaryView,
+                arguments: {
+                  'employee': employee,
+                  'year': selectedYear,
+                  'month': selectedMonth,
+                },
+              );
+            },
+            child: const Text('조회'),
+          ),
+        ],
+      ),
+    );
   }
 }

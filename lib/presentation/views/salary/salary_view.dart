@@ -16,13 +16,6 @@ class SalaryView extends GetView<SalaryController> {
     final year = arguments['year'] as int;
     final month = arguments['month'] as int;
 
-    // 컨트롤러 초기화
-    controller.calculateEmployeeSalary(
-      employee: employee,
-      year: year,
-      month: month,
-    );
-
     final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '');
 
     return Scaffold(
@@ -132,10 +125,24 @@ class SalaryView extends GetView<SalaryController> {
                         '${currencyFormat.format(salaryData['weeklyHolidayPay'])}원',
                         valueColor: Colors.green,
                       ),
-                      const Divider(height: 24, thickness: 2),
+                      const Divider(height: 24, thickness: 1),
                       _buildInfoRow(
                         '총 급여',
                         '${currencyFormat.format(salaryData['totalPay'])}원',
+                        valueColor: Theme.of(context).primaryColor,
+                        isBold: true,
+                        fontSize: 16,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        '세금 (3.3%)',
+                        '-${currencyFormat.format(salaryData['tax'])}원',
+                        valueColor: Colors.red,
+                      ),
+                      const Divider(height: 24, thickness: 2),
+                      _buildInfoRow(
+                        '실수령액',
+                        '${currencyFormat.format(salaryData['netPay'])}원',
                         valueColor: Theme.of(context).primaryColor,
                         isBold: true,
                         fontSize: 18,
@@ -225,7 +232,7 @@ class SalaryView extends GetView<SalaryController> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '일용직 급여 계산\n• 기본급: 시급 × 근무시간\n• 주휴수당: 주 15시간 이상 근무 시 지급',
+                        '일용직 급여 계산\n• 기본급: 시급 × 근무시간\n• 주휴수당: 주 15시간 이상 근무 시 지급 (일평균 근무시간, 최대 8시간)',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.blue[700],
