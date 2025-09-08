@@ -43,3 +43,30 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase 설정 파일들 (보안상 중요)
+ios/Runner/GoogleService-Info.plist
+android/app/google-services.json
+lib/firebase_options.dart
+ios/firebase_app_id_file.json
+
+# 환경 변수 파일들
+.env
+.env.local
+.env.production
+.env.staging
+
+# iOS 관련 민감한 파일들
+ios/Runner/GoogleService-Info.plist
+ios/Runner/Info.plist.backup
+ios/Runner/firebase_app_id_file.json
+
+# Android 관련 민감한 파일들
+android/app/google-services.json
+android/key.properties
+android/app/release-key.keystore
+android/app/debug-key.keystore
+
+# 기타 보안 관련 파일들
+*.p12
+*.mobileprovision
