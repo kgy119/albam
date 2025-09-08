@@ -7,6 +7,8 @@ class Employee {
   final String phoneNumber;
   final String? contractImageUrl;
   final int hourlyWage;
+  final String? bankName;
+  final String? accountNumber;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -17,6 +19,8 @@ class Employee {
     required this.phoneNumber,
     this.contractImageUrl,
     required this.hourlyWage,
+    this.bankName,
+    this.accountNumber,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -30,6 +34,8 @@ class Employee {
       phoneNumber: data['phoneNumber'] ?? '',
       contractImageUrl: data['contractImageUrl'],
       hourlyWage: data['hourlyWage'] ?? 0,
+      bankName: data['bankName'],
+      accountNumber: data['accountNumber'],
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -42,6 +48,8 @@ class Employee {
       'phoneNumber': phoneNumber,
       'contractImageUrl': contractImageUrl,
       'hourlyWage': hourlyWage,
+      'bankName': bankName,
+      'accountNumber': accountNumber,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };

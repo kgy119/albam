@@ -11,6 +11,8 @@ class AddEmployeeController extends GetxController {
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
   final wageController = TextEditingController();
+  final bankNameController = TextEditingController();
+  final accountNumberController = TextEditingController();
 
   // 폼 키
   final formKey = GlobalKey<FormState>();
@@ -56,6 +58,8 @@ class AddEmployeeController extends GetxController {
     nameController.dispose();
     phoneController.dispose();
     wageController.dispose();
+    bankNameController.dispose();
+    accountNumberController.dispose();
     super.onClose();
   }
 
@@ -153,6 +157,8 @@ class AddEmployeeController extends GetxController {
         phoneNumber: phoneController.text.trim(),
         hourlyWage: int.parse(wageController.text.trim()),
         contractImageUrl: contractImageUrl,
+        bankName: bankNameController.text.trim().isEmpty ? null : bankNameController.text.trim(),
+        accountNumber: accountNumberController.text.trim().isEmpty ? null : accountNumberController.text.trim(),
       );
 
       if (success) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_constants.dart';
@@ -62,6 +63,56 @@ class SalaryView extends GetView<SalaryController> {
                         '시급',
                         '${currencyFormat.format(employee.hourlyWage)}원',
                       ),
+                      const SizedBox(height: 8),
+
+                      // 계좌정보 추가
+                      if (employee.bankName != null && employee.accountNumber != null) ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('계좌번호'),
+                            GestureDetector(
+                              onTap: () {
+                                Clipboard.setData(ClipboardData(text: employee.accountNumber!));
+                                Get.snackbar(
+                                  '복사완료',
+                                  '계좌번호가 클립보드에 복사되었습니다.',
+                                  snackPosition: SnackPosition.BOTTOM,
+                                  duration: const Duration(seconds: 2),
+                                  backgroundColor: Colors.green,
+                                  colorText: Colors.white,
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue[50],
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: Colors.blue[200]!),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '${employee.bankName} ${employee.accountNumber}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue[700],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.copy,
+                                      size: 16,
+                                      color: Colors.blue[700],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

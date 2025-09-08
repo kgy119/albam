@@ -32,6 +32,10 @@ class AddEmployeeView extends GetView<AddEmployeeController> {
               _buildWageField(),
               const SizedBox(height: 24),
 
+              // 계좌정보 입력 추가
+              _buildBankInfoFields(),
+              const SizedBox(height: 24),
+
               // 근로계약서 섹션
               _buildContractSection(),
               const SizedBox(height: 32),
@@ -306,4 +310,45 @@ class AddEmployeeView extends GetView<AddEmployeeController> {
       )),
     );
   }
+
+  Widget _buildBankInfoFields() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '계좌정보 (선택사항)',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // 은행명
+        TextFormField(
+          controller: controller.bankNameController,
+          decoration: const InputDecoration(
+            hintText: '예) 국민은행',
+            prefixIcon: Icon(Icons.account_balance),
+            labelText: '은행명',
+          ),
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 16),
+
+        // 계좌번호
+        TextFormField(
+          controller: controller.accountNumberController,
+          decoration: const InputDecoration(
+            hintText: '123456-78-901234',
+            prefixIcon: Icon(Icons.credit_card),
+            labelText: '계좌번호',
+          ),
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.done,
+        ),
+      ],
+    );
+  }
+
 }
