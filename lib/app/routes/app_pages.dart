@@ -5,6 +5,7 @@ import '../../presentation/controllers/salary_controller.dart';
 import '../../presentation/controllers/schedule_setting_controller.dart';
 import '../../presentation/controllers/workplace_detail_controller.dart';
 import '../../presentation/views/employee/add_employee_view.dart';
+import '../../presentation/views/employee/edit_employee_view.dart';
 import '../../presentation/views/employee/employee_list_view.dart';
 import '../../presentation/views/salary/salary_view.dart';
 import '../../presentation/views/schedule/schedule_setting_view.dart';
@@ -63,5 +64,10 @@ class AppPages {
         Get.lazyPut<SalaryController>(() => SalaryController());
       }),
     ),
+    GetPage(
+      name: AppRoutes.editEmployee,
+      page: () => const EditEmployeeView(),
+    ),
+
   ];
 }

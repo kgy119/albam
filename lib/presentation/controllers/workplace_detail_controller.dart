@@ -126,6 +126,8 @@ class WorkplaceDetailController extends GetxController {
     required String phoneNumber,
     required int hourlyWage,
     String? contractImageUrl,
+    String? bankName,        // 추가
+    String? accountNumber,   // 추가
   }) async {
     try {
       print('직원 수정 시작: $name');
@@ -134,6 +136,8 @@ class WorkplaceDetailController extends GetxController {
         'name': name,
         'phoneNumber': phoneNumber,
         'hourlyWage': hourlyWage,
+        'bankName': bankName,           // 추가
+        'accountNumber': accountNumber, // 추가
         'updatedAt': Timestamp.fromDate(DateTime.now()),
       };
 
