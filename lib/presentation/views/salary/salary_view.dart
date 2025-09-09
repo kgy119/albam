@@ -141,10 +141,51 @@ class SalaryView extends GetView<SalaryController> {
                       ),
                       const SizedBox(height: 8),
                       _buildInfoRow(
+                        '정규근무',
+                        '${salaryData['regularHours'].toStringAsFixed(1)} 시간',
+                        valueColor: Colors.blue,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        '대체근무',
+                        '${salaryData['substituteHours'].toStringAsFixed(1)} 시간',
+                        valueColor: Colors.orange,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
                         '주휴 적용시간',
                         '${salaryData['weeklyHolidayHours'].toStringAsFixed(1)} 시간',
                         valueColor: Colors.green,
                       ),
+                      const SizedBox(height: 12),
+
+                      // 대체근무 안내
+                      if (salaryData['substituteHours'] > 0) ...[
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.orange[50],
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.orange[200]!),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline,
+                                  color: Colors.orange[700], size: 16),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  '대체근무 시간은 주휴수당 계산에서 제외됩니다.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.orange[700],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -213,10 +254,18 @@ class SalaryView extends GetView<SalaryController> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          '주별 근무 내역',
+                          '주별 근무 내역 (정규근무)',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '※ 대체근무는 주휴수당 계산에서 제외',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -283,7 +332,7 @@ class SalaryView extends GetView<SalaryController> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '일용직 급여 계산\n• 기본급: 시급 × 근무시간\n• 주휴수당: 주 15시간 이상 근무 시 지급 (일평균 근무시간, 최대 8시간)',
+                        '일용직 급여 계산\n• 기본급: 시급 × 전체근무시간(정규+대체)\n• 주휴수당: 정규근무만 계산, 주 15시간 이상 시 지급\n• 대체근무: 기본급에는 포함, 주휴수당에는 제외',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.blue[700],
@@ -293,6 +342,8 @@ class SalaryView extends GetView<SalaryController> {
                   ],
                 ),
               ),
+              // 추가 하단 여백 (네비게이션 바를 위한 여유 공간)
+              const SizedBox(height: 30),
             ],
           ),
         );

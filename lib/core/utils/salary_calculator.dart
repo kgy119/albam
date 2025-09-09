@@ -10,31 +10,38 @@ class SalaryCalculator {
     double totalHours = 0;
     double weeklyHolidayHours = 0;
 
-    // 주별 근무 정리
+    // 주별 근무 정리 (대체근무 제외)
     Map<int, Map<DateTime, double>> weeklySchedules = {};
     Map<DateTime, double> dailyHours = {};
+
+    // 대체근무 시간 따로 계산
+    double substituteHours = 0;
 
     for (var schedule in schedules) {
       final date = DateTime(schedule.date.year, schedule.date.month, schedule.date.day);
       final hours = schedule.totalMinutes / 60.0;
 
-      // 일별 근무시간 누적
+      // 일별 근무시간 누적 (모든 근무시간 포함)
       dailyHours[date] = (dailyHours[date] ?? 0) + hours;
-
-      // 주별 스케줄 정리
-      int weekNumber = _getWeekOfMonth(date);
-      weeklySchedules[weekNumber] ??= {};
-      weeklySchedules[weekNumber]![date] =
-          (weeklySchedules[weekNumber]![date] ?? 0) + hours;
-
       totalHours += hours;
+
+      if (schedule.isSubstitute) {
+        // 대체근무 시간은 따로 계산
+        substituteHours += hours;
+      } else {
+        // 정규근무만 주휴수당 계산에 포함
+        int weekNumber = _getWeekOfMonth(date);
+        weeklySchedules[weekNumber] ??= {};
+        weeklySchedules[weekNumber]![date] =
+            (weeklySchedules[weekNumber]![date] ?? 0) + hours;
+      }
     }
 
-    // 주휴수당 계산
+    // 주휴수당 계산 (정규근무만 포함)
     weeklyHolidayHours = _calculateWeeklyHolidayHours(weeklySchedules);
 
     // 급여 계산
-    double basicPay = totalHours * hourlyWage;
+    double basicPay = totalHours * hourlyWage; // 전체 시간으로 기본급 계산
     double weeklyHolidayPay = weeklyHolidayHours * hourlyWage;
     double totalPay = basicPay + weeklyHolidayPay;
 
@@ -44,6 +51,8 @@ class SalaryCalculator {
 
     return {
       'totalHours': totalHours,
+      'regularHours': totalHours - substituteHours, // 정규근무 시간
+      'substituteHours': substituteHours, // 대체근무 시간
       'weeklyHolidayHours': weeklyHolidayHours,
       'basicPay': basicPay,
       'weeklyHolidayPay': weeklyHolidayPay,
@@ -54,7 +63,7 @@ class SalaryCalculator {
     };
   }
 
-  /// 주휴수당 시간 계산 (수정된 버전)
+  /// 주휴수당 시간 계산 (정규근무만 포함)
   static double _calculateWeeklyHolidayHours(
       Map<int, Map<DateTime, double>> weeklySchedules) {
     double totalWeeklyHolidayHours = 0;

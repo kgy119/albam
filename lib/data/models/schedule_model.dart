@@ -9,6 +9,7 @@ class Schedule {
   final DateTime startTime;
   final DateTime endTime;
   final int totalMinutes; // 총 근무 시간 (분 단위)
+  final bool isSubstitute; // 대체근무 여부 추가
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -21,6 +22,7 @@ class Schedule {
     required this.startTime,
     required this.endTime,
     required this.totalMinutes,
+    this.isSubstitute = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -36,6 +38,7 @@ class Schedule {
       startTime: (data['startTime'] as Timestamp).toDate(),
       endTime: (data['endTime'] as Timestamp).toDate(),
       totalMinutes: data['totalMinutes'] ?? 0,
+      isSubstitute: data['isSubstitute'] ?? false,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -50,6 +53,7 @@ class Schedule {
       'startTime': Timestamp.fromDate(startTime),
       'endTime': Timestamp.fromDate(endTime),
       'totalMinutes': totalMinutes,
+      'isSubstitute': isSubstitute,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -69,6 +73,11 @@ class Schedule {
     final endHour = endTime.hour.toString().padLeft(2, '0');
     final endMinute = endTime.minute.toString().padLeft(2, '0');
     return '$startHour:$startMinute ~ $endHour:$endMinute';
+  }
+
+  /// 대체근무 여부 표시 문자열
+  String get workTypeDisplay {
+    return isSubstitute ? '대체근무' : '정규근무';
   }
 
   /// 시간 계산 유틸리티

@@ -86,6 +86,7 @@ class ScheduleSettingController extends GetxController {
     required String employeeId,
     required TimeOfDay startTime,
     required TimeOfDay endTime,
+    bool isSubstitute = false, // 대체근무 여부 추가
   }) async {
     try {
       // 직원 정보 찾기
@@ -130,6 +131,7 @@ class ScheduleSettingController extends GetxController {
         'startTime': Timestamp.fromDate(startDateTime),
         'endTime': Timestamp.fromDate(actualEndDateTime),
         'totalMinutes': totalMinutes,
+        'isSubstitute': isSubstitute, // 추가
         'createdAt': Timestamp.fromDate(now),
         'updatedAt': Timestamp.fromDate(now),
       };
@@ -145,6 +147,7 @@ class ScheduleSettingController extends GetxController {
       Get.snackbar('오류', '스케줄 추가에 실패했습니다.');
     }
   }
+
 
   /// 스케줄 삭제
   Future<void> deleteSchedule(String scheduleId) async {
@@ -193,6 +196,7 @@ class ScheduleSettingController extends GetxController {
     required String employeeId,
     required TimeOfDay startTime,
     required TimeOfDay endTime,
+    bool isSubstitute = false, // 대체근무 여부 추가
   }) async {
     try {
       // 직원 정보 찾기
@@ -234,6 +238,7 @@ class ScheduleSettingController extends GetxController {
         'startTime': Timestamp.fromDate(startDateTime),
         'endTime': Timestamp.fromDate(actualEndDateTime),
         'totalMinutes': totalMinutes,
+        'isSubstitute': isSubstitute, // 추가
         'updatedAt': Timestamp.fromDate(DateTime.now()),
       };
 
@@ -249,6 +254,7 @@ class ScheduleSettingController extends GetxController {
       Get.snackbar('오류', '스케줄 수정에 실패했습니다.');
     }
   }
+
 
   /// 스케줄 수정 다이얼로그 표시
   void showEditScheduleDialog(schedule) {
@@ -266,6 +272,7 @@ class ScheduleSettingController extends GetxController {
       hour: schedule.endTime.hour,
       minute: schedule.endTime.minute,
     );
+    bool isSubstitute = schedule.isSubstitute; // 기존 대체근무 상태
 
     Get.dialog(
       StatefulBuilder(
@@ -325,6 +332,19 @@ class ScheduleSettingController extends GetxController {
                     }
                   },
                 ),
+
+                // 대체근무 체크박스 추가
+                CheckboxListTile(
+                  title: const Text('대체근무'),
+                  subtitle: const Text('다른 직원 대신 근무하는 경우 체크'),
+                  value: isSubstitute,
+                  onChanged: (value) {
+                    setState(() {
+                      isSubstitute = value ?? false;
+                    });
+                  },
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
               ],
             ),
             actions: [
@@ -341,6 +361,7 @@ class ScheduleSettingController extends GetxController {
                     employeeId: selectedEmployeeId!,
                     startTime: startTime!,
                     endTime: endTime!,
+                    isSubstitute: isSubstitute, // 대체근무 여부 전달
                   );
                 }
                     : null,
@@ -352,6 +373,7 @@ class ScheduleSettingController extends GetxController {
       ),
     );
   }
+
 
   /// 해당 월의 스케줄이 있는 날짜들 조회
   Future<List<DateTime>> getScheduleDates() async {
@@ -422,9 +444,20 @@ class ScheduleSettingController extends GetxController {
         return;
       }
 
+      // 현재 날짜의 기존 스케줄 조회
+      final existingSchedules = await getSchedulesByDate(selectedDate);
+
       final batch = _firestore.batch();
       final now = DateTime.now();
 
+      // 1. 기존 스케줄 삭제
+      for (var existingSchedule in existingSchedules) {
+        batch.delete(
+          _firestore.collection(AppConstants.schedulesCollection).doc(existingSchedule.id),
+        );
+      }
+
+      // 2. 새로운 스케줄 추가
       for (var sourceSchedule in sourceSchedules) {
         // 새로운 날짜로 시간 설정
         final newStartTime = DateTime(
@@ -456,6 +489,7 @@ class ScheduleSettingController extends GetxController {
           'startTime': Timestamp.fromDate(newStartTime),
           'endTime': Timestamp.fromDate(actualEndTime),
           'totalMinutes': sourceSchedule.totalMinutes,
+          'isSubstitute': sourceSchedule.isSubstitute,
           'createdAt': Timestamp.fromDate(now),
           'updatedAt': Timestamp.fromDate(now),
         };
@@ -465,14 +499,19 @@ class ScheduleSettingController extends GetxController {
         batch.set(newDocRef, newScheduleData);
       }
 
+      // 배치 커밋 (기존 삭제 + 새로운 추가 동시 실행)
       await batch.commit();
       await loadSchedules(); // 목록 새로고침
 
+      final deletedCount = existingSchedules.length;
+      final addedCount = sourceSchedules.length;
+
       Get.snackbar(
-        '성공',
-        '${sourceDate.month}/${sourceDate.day}일 스케줄이 복사되었습니다. (${sourceSchedules.length}개)',
+        '완료',
+        '기존 스케줄 ${deletedCount}개 삭제 후\n${sourceDate.month}/${sourceDate.day}일 스케줄 ${addedCount}개가 복사되었습니다.',
         backgroundColor: Colors.green,
         colorText: Colors.white,
+        duration: const Duration(seconds: 3),
       );
 
     } catch (e) {
@@ -482,6 +521,7 @@ class ScheduleSettingController extends GetxController {
       isSaving.value = false;
     }
   }
+
 
   /// 스케줄 복사 다이얼로그 표시
   void showCopyScheduleDialog() async {
@@ -578,6 +618,7 @@ class ScheduleSettingController extends GetxController {
     String? selectedEmployeeId;
     TimeOfDay? startTime;
     TimeOfDay? endTime;
+    bool isSubstitute = false; // 대체근무 체크박스 상태
 
     Get.dialog(
       StatefulBuilder(
@@ -637,6 +678,19 @@ class ScheduleSettingController extends GetxController {
                     }
                   },
                 ),
+
+                // 대체근무 체크박스 추가
+                CheckboxListTile(
+                  title: const Text('대체근무'),
+                  subtitle: const Text('다른 직원 대신 근무하는 경우 체크'),
+                  value: isSubstitute,
+                  onChanged: (value) {
+                    setState(() {
+                      isSubstitute = value ?? false;
+                    });
+                  },
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
               ],
             ),
             actions: [
@@ -652,6 +706,7 @@ class ScheduleSettingController extends GetxController {
                     employeeId: selectedEmployeeId!,
                     startTime: startTime!,
                     endTime: endTime!,
+                    isSubstitute: isSubstitute, // 대체근무 여부 전달
                   );
                 }
                     : null,
@@ -663,4 +718,5 @@ class ScheduleSettingController extends GetxController {
       ),
     );
   }
+
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../../data/models/schedule_model.dart';
 import '../../controllers/schedule_setting_controller.dart';
 
 class ScheduleSettingView extends GetView<ScheduleSettingController> {
@@ -216,11 +217,15 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
               children: [
                 // 직원 아바타
                 CircleAvatar(
-                  backgroundColor: Theme.of(Get.context!).primaryColor.withOpacity(0.1),
+                  backgroundColor: schedule.isSubstitute
+                      ? Colors.orange.withOpacity(0.1) // 대체근무시 다른 색상
+                      : Theme.of(Get.context!).primaryColor.withOpacity(0.1),
                   child: Text(
                     schedule.employeeName.isNotEmpty ? schedule.employeeName[0] : '?',
                     style: TextStyle(
-                      color: Theme.of(Get.context!).primaryColor,
+                      color: schedule.isSubstitute
+                          ? Colors.orange[700] // 대체근무시 다른 색상
+                          : Theme.of(Get.context!).primaryColor,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -233,12 +238,35 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        schedule.employeeName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            schedule.employeeName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          // 대체근무 표시 추가
+                          if (schedule.isSubstitute) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                '대체',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       Text(
                         schedule.timeRangeString,
@@ -255,7 +283,9 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Theme.of(Get.context!).primaryColor.withOpacity(0.1),
+                    color: schedule.isSubstitute
+                        ? Colors.orange.withOpacity(0.1) // 대체근무시 다른 색상
+                        : Theme.of(Get.context!).primaryColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -263,7 +293,9 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: Theme.of(Get.context!).primaryColor,
+                      color: schedule.isSubstitute
+                          ? Colors.orange[700] // 대체근무시 다른 색상
+                          : Theme.of(Get.context!).primaryColor,
                     ),
                   ),
                 ),
@@ -314,6 +346,7 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
     );
   }
 
+
   Widget _buildTimeBar(schedule) {
     // 시작 시간을 0~24시간 범위로 정규화
     final startHour = schedule.startTime.hour + (schedule.startTime.minute / 60.0);
@@ -337,7 +370,9 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
               width: MediaQuery.of(Get.context!).size.width * 0.8 * duration,
               height: 8,
               decoration: BoxDecoration(
-                color: Theme.of(Get.context!).primaryColor,
+                color: schedule.isSubstitute
+                    ? Colors.orange // 대체근무시 다른 색상
+                    : Theme.of(Get.context!).primaryColor,
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -346,6 +381,7 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
       ),
     );
   }
+
 
   void _showDeleteDialog(schedule) {
     Get.dialog(
@@ -398,6 +434,177 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
               foregroundColor: Colors.white,
             ),
             child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+  }
+  /// 스케줄 복사 다이얼로그 표시
+  void showCopyScheduleDialog() async {
+    final scheduleDates = await controller.getScheduleDates();
+
+    if (scheduleDates.isEmpty) {
+      Get.snackbar('알림', '이번 달에 등록된 스케줄이 없습니다.');
+      return;
+    }
+
+    // 현재 날짜 제외
+    final currentDate = DateTime(controller.selectedDate.year, controller.selectedDate.month, controller.selectedDate.day);
+    scheduleDates.removeWhere((date) => date.isAtSameMomentAs(currentDate));
+
+    if (scheduleDates.isEmpty) {
+      Get.snackbar('알림', '복사할 수 있는 다른 날짜의 스케줄이 없습니다.');
+      return;
+    }
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('스케줄 복사'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 경고 메시지 추가
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber, color: Colors.orange[700], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '기존 스케줄이 모두 삭제되고\n선택한 날짜의 스케줄로 교체됩니다.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('복사할 날짜를 선택하세요:'),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 300,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: scheduleDates.length,
+                  itemBuilder: (context, index) {
+                    final date = scheduleDates[index];
+                    return FutureBuilder<List<Schedule>>(
+                      future: controller.getSchedulesByDate(date),
+                      builder: (context, snapshot) {
+                        final schedules = snapshot.data ?? [];
+                        final totalHours = schedules.fold<double>(
+                            0, (sum, schedule) => sum + (schedule.totalMinutes / 60.0)
+                        );
+
+                        return Card(
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Theme.of(Get.context!).primaryColor,
+                              child: Text(
+                                '${date.day}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            title: Text('${date.month}/${date.day}일'),
+                            subtitle: Text(
+                              '${schedules.length}개 스케줄 • ${totalHours.toStringAsFixed(1)}시간',
+                            ),
+                            trailing: const Icon(Icons.copy),
+                            onTap: () async {
+                              // 복사 확인 다이얼로그 표시
+                              _showCopyConfirmDialog(date);
+                            },
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 복사 확인 다이얼로그
+  void _showCopyConfirmDialog(DateTime sourceDate) {
+    Get.back(); // 이전 다이얼로그 닫기
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('스케줄 복사 확인'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${sourceDate.month}/${sourceDate.day}일의 스케줄을'),
+            Text('${controller.selectedDate.month}/${controller.selectedDate.day}일로 복사하시겠습니까?'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.red[700], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '현재 날짜의 기존 스케줄이 모두 삭제됩니다.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Get.back();
+              await controller.copySchedulesFromDate(sourceDate);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('복사'),
           ),
         ],
       ),
