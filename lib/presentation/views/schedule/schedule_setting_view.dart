@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../../core/utils/date_utils.dart' as date_utils;
 import '../../../data/models/schedule_model.dart';
 import '../../controllers/schedule_setting_controller.dart';
 
@@ -9,20 +10,37 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
 
   @override
   Widget build(BuildContext context) {
+    final weekday = controller.selectedDate.weekday;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          '${controller.selectedDate.month}월 ${controller.selectedDate.day}일 스케줄',
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${controller.selectedDate.month}월 ${controller.selectedDate.day}일',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              date_utils.DateUtils.getWeekdayText(weekday),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: date_utils.DateUtils.getWeekdayColorForDarkBg(weekday),
+              ),
+            ),
+          ],
         ),
         actions: [
-          // 복사 버튼
           IconButton(
             icon: const Icon(Icons.copy),
             onPressed: () => controller.showCopyScheduleDialog(),
             tooltip: '다른 날 복사',
           ),
-
-          // 총 근무시간 표시
           Obx(() => Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Center(

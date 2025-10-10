@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/utils/date_utils.dart' as date_utils;
 import '../../data/models/workplace_model.dart';
 import '../../data/models/employee_model.dart';
 import '../../data/models/schedule_model.dart';
@@ -375,17 +376,21 @@ class ScheduleSettingController extends GetxController {
   }
 
 
-  /// 해당 월의 스케줄이 있는 날짜들 조회
+  /// 스케줄이 있는 날짜들 조회 (수정: 이전 달 포함)
   Future<List<DateTime>> getScheduleDates() async {
     try {
-      final startOfMonth = DateTime(selectedDate.year, selectedDate.month, 1);
-      final endOfMonth = DateTime(selectedDate.year, selectedDate.month + 1, 1);
+      // 현재 선택된 달의 시작
+      final currentMonthStart = DateTime(selectedDate.year, selectedDate.month, 1);
+
+      // 3개월 전부터 조회 (현재 달 포함)
+      final startDate = DateTime(selectedDate.year, selectedDate.month - 2, 1);
+      final endDate = DateTime(selectedDate.year, selectedDate.month + 1, 1);
 
       final querySnapshot = await _firestore
           .collection(AppConstants.schedulesCollection)
           .where('workplaceId', isEqualTo: workplace.id)
-          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
-          .where('date', isLessThan: Timestamp.fromDate(endOfMonth))
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .where('date', isLessThan: Timestamp.fromDate(endDate))
           .get();
 
       // 중복 제거를 위해 Set 사용
@@ -397,6 +402,10 @@ class ScheduleSettingController extends GetxController {
         final dateOnly = DateTime(date.year, date.month, date.day);
         uniqueDates.add(dateOnly);
       }
+
+      // 현재 날짜 제외
+      final currentDate = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      uniqueDates.removeWhere((date) => date.isAtSameMomentAs(currentDate));
 
       List<DateTime> sortedDates = uniqueDates.toList()
         ..sort((a, b) => b.compareTo(a)); // 최신 날짜부터
@@ -523,22 +532,21 @@ class ScheduleSettingController extends GetxController {
   }
 
 
-  /// 스케줄 복사 다이얼로그 표시
+  /// 스케줄 복사 다이얼로그 표시 (수정: Row 오버플로우 해결)
   void showCopyScheduleDialog() async {
     final scheduleDates = await getScheduleDates();
 
     if (scheduleDates.isEmpty) {
-      Get.snackbar('알림', '이번 달에 등록된 스케줄이 없습니다.');
+      Get.snackbar('알림', '복사할 수 있는 스케줄이 없습니다.');
       return;
     }
 
-    // 현재 날짜 제외
-    final currentDate = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
-    scheduleDates.removeWhere((date) => date.isAtSameMomentAs(currentDate));
-
-    if (scheduleDates.isEmpty) {
-      Get.snackbar('알림', '복사할 수 있는 다른 날짜의 스케줄이 없습니다.');
-      return;
+    // 월별로 그룹화
+    Map<String, List<DateTime>> groupedByMonth = {};
+    for (var date in scheduleDates) {
+      final monthKey = '${date.year}년 ${date.month}월';
+      groupedByMonth[monthKey] ??= [];
+      groupedByMonth[monthKey]!.add(date);
     }
 
     Get.dialog(
@@ -551,46 +559,162 @@ class ScheduleSettingController extends GetxController {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('복사할 날짜를 선택하세요:'),
+              const SizedBox(height: 8),
+              Text(
+                '최근 3개월 이내의 스케줄',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
               const SizedBox(height: 16),
               SizedBox(
-                height: 300,
+                height: 400,
                 child: ListView.builder(
                   shrinkWrap: true,
-                  itemCount: scheduleDates.length,
-                  itemBuilder: (context, index) {
-                    final date = scheduleDates[index];
-                    return FutureBuilder<List<Schedule>>(
-                      future: getSchedulesByDate(date),
-                      builder: (context, snapshot) {
-                        final schedules = snapshot.data ?? [];
-                        final totalHours = schedules.fold<double>(
-                            0, (sum, schedule) => sum + (schedule.totalMinutes / 60.0)
-                        );
+                  itemCount: groupedByMonth.length,
+                  itemBuilder: (context, monthIndex) {
+                    final monthKey = groupedByMonth.keys.elementAt(monthIndex);
+                    final datesInMonth = groupedByMonth[monthKey]!;
 
-                        return Card(
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: Theme.of(Get.context!).primaryColor,
-                              child: Text(
-                                '${date.day}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            title: Text('${date.month}/${date.day}일'),
-                            subtitle: Text(
-                              '${schedules.length}개 스케줄 • ${totalHours.toStringAsFixed(1)}시간',
-                            ),
-                            trailing: const Icon(Icons.copy),
-                            onTap: () async {
-                              Get.back();
-                              await copySchedulesFromDate(date);
-                            },
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 월 헤더
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 8,
                           ),
-                        );
-                      },
+                          child: Text(
+                            monthKey,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(Get.context!).primaryColor,
+                            ),
+                          ),
+                        ),
+
+                        // 해당 월의 날짜들
+                        ...datesInMonth.map((date) {
+                          return FutureBuilder<List<Schedule>>(
+                            future: getSchedulesByDate(date),
+                            builder: (context, snapshot) {
+                              final schedules = snapshot.data ?? [];
+                              final totalHours = schedules.fold<double>(
+                                0,
+                                    (sum, schedule) => sum + (schedule.totalMinutes / 60.0),
+                              );
+
+                              final isCurrentMonth = date.year == selectedDate.year &&
+                                  date.month == selectedDate.month;
+                              final weekday = date.weekday;
+
+                              return Card(
+                                color: isCurrentMonth ? null : Colors.grey[50],
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 4,
+                                ),
+                                child: InkWell(
+                                  onTap: () async {
+                                    Get.back();
+                                    await copySchedulesFromDate(date);
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Row(
+                                      children: [
+                                        // 요일 아이콘
+                                        CircleAvatar(
+                                          radius: 20,
+                                          backgroundColor: date_utils.DateUtils
+                                              .getWeekdayColorForLightBg(
+                                            weekday,
+                                            dimmed: !isCurrentMonth,
+                                          ),
+                                          child: Text(
+                                            date_utils.DateUtils.getWeekdayText(weekday),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+
+                                        // 날짜 정보
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Text(
+                                                    '${date.month}/${date.day}일',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 15,
+                                                      color: date_utils.DateUtils
+                                                          .getWeekdayTextColor(weekday),
+                                                    ),
+                                                  ),
+                                                  if (!isCurrentMonth) ...[
+                                                    const SizedBox(width: 8),
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2,
+                                                      ),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.orange[100],
+                                                        borderRadius: BorderRadius.circular(4),
+                                                      ),
+                                                      child: Text(
+                                                        '지난 달',
+                                                        style: TextStyle(
+                                                          fontSize: 10,
+                                                          color: Colors.orange[800],
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                '${schedules.length}개 스케줄 • ${totalHours.toStringAsFixed(1)}시간',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[600],
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+
+                                        // 복사 아이콘
+                                        Icon(
+                                          Icons.copy,
+                                          color: Colors.grey[600],
+                                          size: 20,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        }).toList(),
+
+                        const SizedBox(height: 8),
+                      ],
                     );
                   },
                 ),
@@ -607,6 +731,7 @@ class ScheduleSettingController extends GetxController {
       ),
     );
   }
+
 
   /// 스케줄 추가 다이얼로그 표시
   void showAddScheduleDialog() {

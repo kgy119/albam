@@ -11,6 +11,11 @@ class SalaryController extends GetxController {
   RxBool isLoading = false.obs;
   Rxn<Map<String, dynamic>> salaryData = Rxn<Map<String, dynamic>>();
 
+  RxList<Schedule> monthlySchedules = <Schedule>[].obs;
+
+  // 추가: 선택된 날짜
+  RxInt selectedDay = 0.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -40,7 +45,6 @@ class SalaryController extends GetxController {
   }) async {
     isLoading.value = true;
     try {
-      // 해당 월의 스케줄 조회
       final startOfMonth = DateTime(year, month, 1);
       final endOfMonth = DateTime(year, month + 1, 1);
 
@@ -56,6 +60,9 @@ class SalaryController extends GetxController {
           .map((doc) => Schedule.fromFirestore(doc))
           .toList();
 
+      // 스케줄 목록 저장
+      monthlySchedules.value = schedules;
+
       // 급여 계산
       salaryData.value = SalaryCalculator.calculateMonthlySalary(
         schedules: schedules,
@@ -68,5 +75,55 @@ class SalaryController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  // 추가: 특정 날짜의 총 근무시간 계산
+  double getDayTotalHours(int day, int year, int month) {
+    final targetDate = DateTime(year, month, day);
+
+    double totalHours = 0;
+    for (var schedule in monthlySchedules) {
+      final scheduleDate = DateTime(
+        schedule.date.year,
+        schedule.date.month,
+        schedule.date.day,
+      );
+
+      if (scheduleDate.isAtSameMomentAs(targetDate)) {
+        totalHours += schedule.totalMinutes / 60.0;
+      }
+    }
+
+    return totalHours;
+  }
+
+  // 추가: 특정 날짜의 스케줄 목록
+  List<Schedule> getDaySchedules(int day, int year, int month) {
+    final targetDate = DateTime(year, month, day);
+
+    return monthlySchedules.where((schedule) {
+      final scheduleDate = DateTime(
+        schedule.date.year,
+        schedule.date.month,
+        schedule.date.day,
+      );
+      return scheduleDate.isAtSameMomentAs(targetDate);
+    }).toList();
+  }
+
+  // 추가: 월의 일수 계산
+  int getDaysInMonth(int year, int month) {
+    return DateTime(year, month + 1, 0).day;
+  }
+
+  // 추가: 월의 첫째 날 요일
+  int getFirstDayOfWeek(int year, int month) {
+    final firstDay = DateTime(year, month, 1);
+    return firstDay.weekday;
+  }
+
+  // 추가: 일자 선택
+  void selectDay(int day) {
+    selectedDay.value = day;
   }
 }
