@@ -19,7 +19,7 @@ class AddWorkplaceDialog extends StatelessWidget {
             controller: _nameController,
             decoration: const InputDecoration(
               labelText: '사업장 이름',
-              hintText: '예: 카페 드로잉',
+              hintText: '예: 메가커피 일광',
             ),
             autofocus: true,
             textInputAction: TextInputAction.done,
