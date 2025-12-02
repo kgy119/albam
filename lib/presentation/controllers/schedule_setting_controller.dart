@@ -256,126 +256,6 @@ class ScheduleSettingController extends GetxController {
     }
   }
 
-
-  /// 스케줄 수정 다이얼로그 표시
-  void showEditScheduleDialog(schedule) {
-    if (employees.isEmpty) {
-      Get.snackbar('알림', '등록된 직원이 없습니다.');
-      return;
-    }
-
-    String? selectedEmployeeId = schedule.employeeId;
-    TimeOfDay? startTime = TimeOfDay(
-      hour: schedule.startTime.hour,
-      minute: schedule.startTime.minute,
-    );
-    TimeOfDay? endTime = TimeOfDay(
-      hour: schedule.endTime.hour,
-      minute: schedule.endTime.minute,
-    );
-    bool isSubstitute = schedule.isSubstitute; // 기존 대체근무 상태
-
-    Get.dialog(
-      StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: Text('${selectedDate.month}/${selectedDate.day} 스케줄 수정'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 직원 선택
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: '직원 선택',
-                    border: OutlineInputBorder(),
-                  ),
-                  value: selectedEmployeeId,
-                  items: employees
-                      .map((employee) => DropdownMenuItem(
-                    value: employee.id,
-                    child: Text(employee.name),
-                  ))
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedEmployeeId = value;
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // 시작 시간 선택
-                ListTile(
-                  title: const Text('시작 시간'),
-                  subtitle: Text(startTime?.format(context) ?? '선택해주세요'),
-                  trailing: const Icon(Icons.access_time),
-                  onTap: () async {
-                    final time = await selectTime(context, initialTime: startTime);
-                    if (time != null) {
-                      setState(() {
-                        startTime = time;
-                      });
-                    }
-                  },
-                ),
-
-                // 종료 시간 선택
-                ListTile(
-                  title: const Text('종료 시간'),
-                  subtitle: Text(endTime?.format(context) ?? '선택해주세요'),
-                  trailing: const Icon(Icons.access_time),
-                  onTap: () async {
-                    final time = await selectTime(context, initialTime: endTime);
-                    if (time != null) {
-                      setState(() {
-                        endTime = time;
-                      });
-                    }
-                  },
-                ),
-
-                // 대체근무 체크박스 추가
-                CheckboxListTile(
-                  title: const Text('대체근무'),
-                  subtitle: const Text('다른 직원 대신 근무하는 경우 체크'),
-                  value: isSubstitute,
-                  onChanged: (value) {
-                    setState(() {
-                      isSubstitute = value ?? false;
-                    });
-                  },
-                  controlAffinity: ListTileControlAffinity.leading,
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Get.back(),
-                child: const Text('취소'),
-              ),
-              ElevatedButton(
-                onPressed: selectedEmployeeId != null && startTime != null && endTime != null
-                    ? () async {
-                  Get.back();
-                  await updateSchedule(
-                    scheduleId: schedule.id,
-                    employeeId: selectedEmployeeId!,
-                    startTime: startTime!,
-                    endTime: endTime!,
-                    isSubstitute: isSubstitute, // 대체근무 여부 전달
-                  );
-                }
-                    : null,
-                child: const Text('수정'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-
   /// 스케줄이 있는 날짜들 조회 (수정: 이전 달 포함)
   Future<List<DateTime>> getScheduleDates() async {
     try {
@@ -531,8 +411,250 @@ class ScheduleSettingController extends GetxController {
     }
   }
 
+  /// 스케줄 추가 다이얼로그 표시
+  void showAddScheduleDialog() {
+    if (employees.isEmpty) {
+      Get.snackbar('알림', '등록된 직원이 없습니다.');
+      return;
+    }
 
-  /// 스케줄 복사 다이얼로그 표시 (수정: Row 오버플로우 해결)
+    String? selectedEmployeeId;
+    TimeOfDay? startTime;
+    TimeOfDay? endTime;
+    bool isSubstitute = false;
+
+    showDialog(
+      context: Get.context!,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('${selectedDate.month}/${selectedDate.day} 스케줄 추가'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 직원 선택
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: '직원 선택',
+                      border: OutlineInputBorder(),
+                    ),
+                    value: selectedEmployeeId,
+                    items: employees
+                        .map((employee) => DropdownMenuItem(
+                      value: employee.id,
+                      child: Text(employee.name),
+                    ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedEmployeeId = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 시작 시간 선택
+                  ListTile(
+                    title: const Text('시작 시간'),
+                    subtitle: Text(startTime?.format(context) ?? '선택해주세요'),
+                    trailing: const Icon(Icons.access_time),
+                    onTap: () async {
+                      final time = await selectTime(context, initialTime: startTime);
+                      if (time != null) {
+                        setState(() {
+                          startTime = time;
+                        });
+                      }
+                    },
+                  ),
+
+                  // 종료 시간 선택
+                  ListTile(
+                    title: const Text('종료 시간'),
+                    subtitle: Text(endTime?.format(context) ?? '선택해주세요'),
+                    trailing: const Icon(Icons.access_time),
+                    onTap: () async {
+                      final time = await selectTime(context, initialTime: endTime);
+                      if (time != null) {
+                        setState(() {
+                          endTime = time;
+                        });
+                      }
+                    },
+                  ),
+
+                  // 대체근무 체크박스
+                  CheckboxListTile(
+                    title: const Text('대체근무'),
+                    subtitle: const Text('다른 직원 대신 근무하는 경우 체크'),
+                    value: isSubstitute,
+                    onChanged: (value) {
+                      setState(() {
+                        isSubstitute = value ?? false;
+                      });
+                    },
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Get.back() 대신 사용
+                  },
+                  child: const Text('취소'),
+                ),
+                ElevatedButton(
+                  onPressed: selectedEmployeeId != null && startTime != null && endTime != null
+                      ? () async {
+                    Navigator.of(context).pop(); // Get.back() 대신 사용
+                    await Future.delayed(const Duration(milliseconds: 200));
+                    await addSchedule(
+                      employeeId: selectedEmployeeId!,
+                      startTime: startTime!,
+                      endTime: endTime!,
+                      isSubstitute: isSubstitute,
+                    );
+                  }
+                      : null,
+                  child: const Text('추가'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// 스케줄 수정 다이얼로그 표시
+  void showEditScheduleDialog(schedule) {
+    if (employees.isEmpty) {
+      Get.snackbar('알림', '등록된 직원이 없습니다.');
+      return;
+    }
+
+    String? selectedEmployeeId = schedule.employeeId;
+    TimeOfDay? startTime = TimeOfDay(
+      hour: schedule.startTime.hour,
+      minute: schedule.startTime.minute,
+    );
+    TimeOfDay? endTime = TimeOfDay(
+      hour: schedule.endTime.hour,
+      minute: schedule.endTime.minute,
+    );
+    bool isSubstitute = schedule.isSubstitute;
+
+    showDialog(
+      context: Get.context!,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('${selectedDate.month}/${selectedDate.day} 스케줄 수정'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 직원 선택
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: '직원 선택',
+                      border: OutlineInputBorder(),
+                    ),
+                    value: selectedEmployeeId,
+                    items: employees
+                        .map((employee) => DropdownMenuItem(
+                      value: employee.id,
+                      child: Text(employee.name),
+                    ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedEmployeeId = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 시작 시간 선택
+                  ListTile(
+                    title: const Text('시작 시간'),
+                    subtitle: Text(startTime?.format(context) ?? '선택해주세요'),
+                    trailing: const Icon(Icons.access_time),
+                    onTap: () async {
+                      final time = await selectTime(context, initialTime: startTime);
+                      if (time != null) {
+                        setState(() {
+                          startTime = time;
+                        });
+                      }
+                    },
+                  ),
+
+                  // 종료 시간 선택
+                  ListTile(
+                    title: const Text('종료 시간'),
+                    subtitle: Text(endTime?.format(context) ?? '선택해주세요'),
+                    trailing: const Icon(Icons.access_time),
+                    onTap: () async {
+                      final time = await selectTime(context, initialTime: endTime);
+                      if (time != null) {
+                        setState(() {
+                          endTime = time;
+                        });
+                      }
+                    },
+                  ),
+
+                  // 대체근무 체크박스
+                  CheckboxListTile(
+                    title: const Text('대체근무'),
+                    subtitle: const Text('다른 직원 대신 근무하는 경우 체크'),
+                    value: isSubstitute,
+                    onChanged: (value) {
+                      setState(() {
+                        isSubstitute = value ?? false;
+                      });
+                    },
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Get.back() 대신 사용
+                  },
+                  child: const Text('취소'),
+                ),
+                ElevatedButton(
+                  onPressed: selectedEmployeeId != null && startTime != null && endTime != null
+                      ? () async {
+                    Navigator.of(context).pop(); // Get.back() 대신 사용
+                    await Future.delayed(const Duration(milliseconds: 200));
+                    await updateSchedule(
+                      scheduleId: schedule.id,
+                      employeeId: selectedEmployeeId!,
+                      startTime: startTime!,
+                      endTime: endTime!,
+                      isSubstitute: isSubstitute,
+                    );
+                  }
+                      : null,
+                  child: const Text('수정'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// 스케줄 복사 다이얼로그 표시
   void showCopyScheduleDialog() async {
     final scheduleDates = await getScheduleDates();
 
@@ -549,299 +671,259 @@ class ScheduleSettingController extends GetxController {
       groupedByMonth[monthKey]!.add(date);
     }
 
-    Get.dialog(
-      AlertDialog(
-        title: const Text('스케줄 복사'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('복사할 날짜를 선택하세요:'),
-              const SizedBox(height: 8),
-              Text(
-                '최근 3개월 이내의 스케줄',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 400,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: groupedByMonth.length,
-                  itemBuilder: (context, monthIndex) {
-                    final monthKey = groupedByMonth.keys.elementAt(monthIndex);
-                    final datesInMonth = groupedByMonth[monthKey]!;
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // 월 헤더
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 8,
-                          ),
-                          child: Text(
-                            monthKey,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(Get.context!).primaryColor,
-                            ),
-                          ),
-                        ),
-
-                        // 해당 월의 날짜들
-                        ...datesInMonth.map((date) {
-                          return FutureBuilder<List<Schedule>>(
-                            future: getSchedulesByDate(date),
-                            builder: (context, snapshot) {
-                              final schedules = snapshot.data ?? [];
-                              final totalHours = schedules.fold<double>(
-                                0,
-                                    (sum, schedule) => sum + (schedule.totalMinutes / 60.0),
-                              );
-
-                              final isCurrentMonth = date.year == selectedDate.year &&
-                                  date.month == selectedDate.month;
-                              final weekday = date.weekday;
-
-                              return Card(
-                                color: isCurrentMonth ? null : Colors.grey[50],
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 4,
-                                ),
-                                child: InkWell(
-                                  onTap: () async {
-                                    Get.back();
-                                    await copySchedulesFromDate(date);
-                                  },
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: Row(
-                                      children: [
-                                        // 요일 아이콘
-                                        CircleAvatar(
-                                          radius: 20,
-                                          backgroundColor: date_utils.DateUtils
-                                              .getWeekdayColorForLightBg(
-                                            weekday,
-                                            dimmed: !isCurrentMonth,
-                                          ),
-                                          child: Text(
-                                            date_utils.DateUtils.getWeekdayText(weekday),
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-
-                                        // 날짜 정보
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Text(
-                                                    '${date.month}/${date.day}일',
-                                                    style: TextStyle(
-                                                      fontWeight: FontWeight.bold,
-                                                      fontSize: 15,
-                                                      color: date_utils.DateUtils
-                                                          .getWeekdayTextColor(weekday),
-                                                    ),
-                                                  ),
-                                                  if (!isCurrentMonth) ...[
-                                                    const SizedBox(width: 8),
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(
-                                                        horizontal: 6,
-                                                        vertical: 2,
-                                                      ),
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.orange[100],
-                                                        borderRadius: BorderRadius.circular(4),
-                                                      ),
-                                                      child: Text(
-                                                        '지난 달',
-                                                        style: TextStyle(
-                                                          fontSize: 10,
-                                                          color: Colors.orange[800],
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ],
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                '${schedules.length}개 스케줄 • ${totalHours.toStringAsFixed(1)}시간',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey[600],
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-
-                                        // 복사 아이콘
-                                        Icon(
-                                          Icons.copy,
-                                          color: Colors.grey[600],
-                                          size: 20,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                        }).toList(),
-
-                        const SizedBox(height: 8),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('취소'),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-  /// 스케줄 추가 다이얼로그 표시
-  void showAddScheduleDialog() {
-    if (employees.isEmpty) {
-      Get.snackbar('알림', '등록된 직원이 없습니다.');
-      return;
-    }
-
-    String? selectedEmployeeId;
-    TimeOfDay? startTime;
-    TimeOfDay? endTime;
-    bool isSubstitute = false; // 대체근무 체크박스 상태
-
-    Get.dialog(
-      StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: Text('${selectedDate.month}/${selectedDate.day} 스케줄 추가'),
-            content: Column(
+    showDialog(
+      context: Get.context!,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('스케줄 복사'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 직원 선택
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: '직원 선택',
-                    border: OutlineInputBorder(),
+                const Text('복사할 날짜를 선택하세요:'),
+                const SizedBox(height: 8),
+                Text(
+                  '최근 3개월 이내의 스케줄',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
                   ),
-                  value: selectedEmployeeId,
-                  items: employees
-                      .map((employee) => DropdownMenuItem(
-                    value: employee.id,
-                    child: Text(employee.name),
-                  ))
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedEmployeeId = value;
-                    });
-                  },
                 ),
                 const SizedBox(height: 16),
+                SizedBox(
+                  height: 400,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: groupedByMonth.length,
+                    itemBuilder: (context, monthIndex) {
+                      final monthKey = groupedByMonth.keys.elementAt(monthIndex);
+                      final datesInMonth = groupedByMonth[monthKey]!;
 
-                // 시작 시간 선택
-                ListTile(
-                  title: const Text('시작 시간'),
-                  subtitle: Text(startTime?.format(context) ?? '선택해주세요'),
-                  trailing: const Icon(Icons.access_time),
-                  onTap: () async {
-                    final time = await selectTime(context, initialTime: startTime);
-                    if (time != null) {
-                      setState(() {
-                        startTime = time;
-                      });
-                    }
-                  },
-                ),
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 월 헤더
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 8,
+                            ),
+                            child: Text(
+                              monthKey,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(Get.context!).primaryColor,
+                              ),
+                            ),
+                          ),
 
-                // 종료 시간 선택
-                ListTile(
-                  title: const Text('종료 시간'),
-                  subtitle: Text(endTime?.format(context) ?? '선택해주세요'),
-                  trailing: const Icon(Icons.access_time),
-                  onTap: () async {
-                    final time = await selectTime(context, initialTime: endTime);
-                    if (time != null) {
-                      setState(() {
-                        endTime = time;
-                      });
-                    }
-                  },
-                ),
+                          // 해당 월의 날짜들
+                          ...datesInMonth.map((date) {
+                            return FutureBuilder<List<Schedule>>(
+                              future: getSchedulesByDate(date),
+                              builder: (context, snapshot) {
+                                final schedules = snapshot.data ?? [];
+                                final totalHours = schedules.fold<double>(
+                                  0,
+                                      (sum, schedule) => sum + (schedule.totalMinutes / 60.0),
+                                );
 
-                // 대체근무 체크박스 추가
-                CheckboxListTile(
-                  title: const Text('대체근무'),
-                  subtitle: const Text('다른 직원 대신 근무하는 경우 체크'),
-                  value: isSubstitute,
-                  onChanged: (value) {
-                    setState(() {
-                      isSubstitute = value ?? false;
-                    });
-                  },
-                  controlAffinity: ListTileControlAffinity.leading,
+                                final isCurrentMonth = date.year == selectedDate.year &&
+                                    date.month == selectedDate.month;
+                                final weekday = date.weekday;
+
+                                return Card(
+                                  color: isCurrentMonth ? null : Colors.grey[50],
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 4,
+                                  ),
+                                  child: InkWell(
+                                    onTap: () async {
+                                      Navigator.of(context).pop(); // Get.back() 대신 사용
+                                      await Future.delayed(const Duration(milliseconds: 200));
+                                      _showCopyConfirmDialog(date);
+                                    },
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: Row(
+                                        children: [
+                                          // 요일 아이콘
+                                          CircleAvatar(
+                                            radius: 20,
+                                            backgroundColor: date_utils.DateUtils
+                                                .getWeekdayColorForLightBg(
+                                              weekday,
+                                              dimmed: !isCurrentMonth,
+                                            ),
+                                            child: Text(
+                                              date_utils.DateUtils.getWeekdayText(weekday),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+
+                                          // 날짜 정보
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      '${date.month}/${date.day}일',
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 15,
+                                                        color: date_utils.DateUtils
+                                                            .getWeekdayTextColor(weekday),
+                                                      ),
+                                                    ),
+                                                    if (!isCurrentMonth) ...[
+                                                      const SizedBox(width: 8),
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 2,
+                                                        ),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.orange[100],
+                                                          borderRadius: BorderRadius.circular(4),
+                                                        ),
+                                                        child: Text(
+                                                          '지난 달',
+                                                          style: TextStyle(
+                                                            fontSize: 10,
+                                                            color: Colors.orange[800],
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  '${schedules.length}개 스케줄 • ${totalHours.toStringAsFixed(1)}시간',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey[600],
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          // 복사 아이콘
+                                          Icon(
+                                            Icons.copy,
+                                            color: Colors.grey[600],
+                                            size: 20,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+
+                          const SizedBox(height: 8),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Get.back(),
-                child: const Text('취소'),
-              ),
-              ElevatedButton(
-                onPressed: selectedEmployeeId != null && startTime != null && endTime != null
-                    ? () async {
-                  Get.back();
-                  await addSchedule(
-                    employeeId: selectedEmployeeId!,
-                    startTime: startTime!,
-                    endTime: endTime!,
-                    isSubstitute: isSubstitute, // 대체근무 여부 전달
-                  );
-                }
-                    : null,
-                child: const Text('추가'),
-              ),
-            ],
-          );
-        },
-      ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Get.back() 대신 사용
+              },
+              child: const Text('취소'),
+            ),
+          ],
+        );
+      },
     );
   }
 
+  /// 복사 확인 다이얼로그
+  void _showCopyConfirmDialog(DateTime sourceDate) {
+    showDialog(
+      context: Get.context!,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('스케줄 복사 확인'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${sourceDate.month}/${sourceDate.day}일의 스케줄을'),
+              Text('${selectedDate.month}/${selectedDate.day}일로 복사하시겠습니까?'),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning, color: Colors.red[700], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '현재 날짜의 기존 스케줄이 모두 삭제됩니다.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.red[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Get.back() 대신 사용
+              },
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop(); // Get.back() 대신 사용
+                await Future.delayed(const Duration(milliseconds: 200));
+                await copySchedulesFromDate(sourceDate);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('복사'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }

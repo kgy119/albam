@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import '../../controllers/workplace_detail_controller.dart';
 import '../../../app/routes/app_routes.dart';
 
@@ -19,19 +20,192 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
             },
             tooltip: '직원 관리',
           ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // 월/년 선택 헤더
-          _buildMonthHeader(),
-
-          // 달력
-          Expanded(
-            child: _buildCalendar(),
+          // 전체 급여 요약 버튼 추가
+          IconButton(
+            icon: const Icon(Icons.receipt_long),
+            onPressed: () {
+              Get.toNamed(
+                AppRoutes.monthlySalarySummary,
+                arguments: {
+                  'workplace': controller.workplace,
+                  'year': controller.selectedDate.value.year,
+                  'month': controller.selectedDate.value.month,
+                },
+              );
+            },
+            tooltip: '급여 요약',
           ),
         ],
       ),
+      body: SafeArea(  // SafeArea 추가
+        child: Column(
+          children: [
+            // 월/년 선택 헤더
+            _buildMonthHeader(),
+
+            // 월별 통계 카드
+            _buildMonthlyStatsCard(),
+
+            // 달력
+            Expanded(
+              child: _buildCalendar(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 월별 통계 카드
+  Widget _buildMonthlyStatsCard() {
+    return Obx(() {
+      if (controller.isLoadingStats.value) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+
+      final stats = controller.monthlyStats.value;
+      if (stats.isEmpty) {
+        return const SizedBox.shrink();
+      }
+
+      final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '');
+
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Theme.of(Get.context!).primaryColor,
+              Theme.of(Get.context!).primaryColor.withOpacity(0.8),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(Get.context!).primaryColor.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '이번 달 통계',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '직원 ${stats['employeeCount']}명',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatItem(
+                    '총 근무시간',
+                    '${stats['totalHours'].toStringAsFixed(1)}h',
+                    Icons.access_time,
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 40,
+                  color: Colors.white.withOpacity(0.3),
+                ),
+                Expanded(
+                  child: _buildStatItem(
+                    '총 급여',
+                    '${currencyFormat.format(stats['totalNetPay'])}원',
+                    Icons.monetization_on,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatItem(
+                    '근무일수',
+                    '${stats['totalWorkDays']}일',
+                    Icons.calendar_today,
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 40,
+                  color: Colors.white.withOpacity(0.3),
+                ),
+                Expanded(
+                  child: _buildStatItem(
+                    '주휴수당',
+                    '${currencyFormat.format(stats['totalWeeklyHolidayPay'])}원',
+                    Icons.card_giftcard,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildStatItem(String label, String value, IconData icon) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: Colors.white70),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.white70,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ],
     );
   }
 

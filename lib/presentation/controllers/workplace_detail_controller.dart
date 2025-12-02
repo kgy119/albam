@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/utils/salary_calculator.dart';
 import '../../data/models/workplace_model.dart';
 import '../../data/models/employee_model.dart';
 import '../../data/models/schedule_model.dart';
@@ -27,6 +28,10 @@ class WorkplaceDetailController extends GetxController {
   // 월별 스케줄 데이터
   RxList<Schedule> monthlySchedules = <Schedule>[].obs;
 
+  // 월별 통계 데이터 추가
+  Rx<Map<String, dynamic>> monthlyStats = Rx<Map<String, dynamic>>({});
+  RxBool isLoadingStats = false.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -39,6 +44,12 @@ class WorkplaceDetailController extends GetxController {
     // 월 변경시 스케줄 다시 로드되도록 리스너 추가
     ever(selectedDate, (date) {
       loadMonthlySchedules();
+    });
+
+    // 월 변경시 통계도 다시 로드
+    ever(selectedDate, (date) {
+      loadMonthlySchedules();
+      calculateMonthlyStats();
     });
   }
 
@@ -244,11 +255,102 @@ class WorkplaceDetailController extends GetxController {
           .toList();
 
       print('월별 스케줄 로드 완료: ${monthlySchedules.length}개');
+
+      // 스케줄 로드 후 통계 계산
+      await calculateMonthlyStats();
     } catch (e) {
       print('월별 스케줄 로드 오류: $e');
       monthlySchedules.value = [];
     }
   }
+
+  /// 월별 통계 계산
+  Future<void> calculateMonthlyStats() async {
+    if (employees.isEmpty) {
+      monthlyStats.value = {};
+      return;
+    }
+
+    isLoadingStats.value = true;
+    try {
+      double totalHours = 0;
+      double totalRegularHours = 0;
+      double totalSubstituteHours = 0;
+      double totalWeeklyHolidayHours = 0;
+      double totalBasicPay = 0;
+      double totalWeeklyHolidayPay = 0;
+      double totalSalary = 0;
+      double totalTax = 0;
+      double totalNetPay = 0;
+      int totalWorkDays = 0;
+
+      // 직원별 급여 계산
+      List<Map<String, dynamic>> employeeSalaries = [];
+
+      for (var employee in employees) {
+        // 해당 직원의 이번 달 스케줄 필터링
+        final employeeSchedules = monthlySchedules
+            .where((schedule) => schedule.employeeId == employee.id)
+            .toList();
+
+        if (employeeSchedules.isEmpty) continue;
+
+        // 급여 계산
+        final salaryData = SalaryCalculator.calculateMonthlySalary(
+          schedules: employeeSchedules,
+          hourlyWage: employee.hourlyWage.toDouble(),
+        );
+
+        // 근무일수 계산
+        final workDays = employeeSchedules
+            .map((s) => DateTime(s.date.year, s.date.month, s.date.day))
+            .toSet()
+            .length;
+
+        employeeSalaries.add({
+          'employee': employee,
+          'salaryData': salaryData,
+          'workDays': workDays,
+        });
+
+        // 전체 합계 계산
+        totalHours += salaryData['totalHours'];
+        totalRegularHours += salaryData['regularHours'];
+        totalSubstituteHours += salaryData['substituteHours'];
+        totalWeeklyHolidayHours += salaryData['weeklyHolidayHours'];
+        totalBasicPay += salaryData['basicPay'];
+        totalWeeklyHolidayPay += salaryData['weeklyHolidayPay'];
+        totalSalary += salaryData['totalPay'];
+        totalTax += salaryData['tax'];
+        totalNetPay += salaryData['netPay'];
+        totalWorkDays += workDays;
+      }
+
+      // 통계 데이터 저장
+      monthlyStats.value = {
+        'totalHours': totalHours,
+        'totalRegularHours': totalRegularHours,
+        'totalSubstituteHours': totalSubstituteHours,
+        'totalWeeklyHolidayHours': totalWeeklyHolidayHours,
+        'totalBasicPay': totalBasicPay,
+        'totalWeeklyHolidayPay': totalWeeklyHolidayPay,
+        'totalSalary': totalSalary,
+        'totalTax': totalTax,
+        'totalNetPay': totalNetPay,
+        'totalWorkDays': totalWorkDays,
+        'employeeCount': employeeSalaries.length,
+        'employeeSalaries': employeeSalaries,
+      };
+
+      print('월별 통계 계산 완료');
+    } catch (e) {
+      print('월별 통계 계산 오류: $e');
+      monthlyStats.value = {};
+    } finally {
+      isLoadingStats.value = false;
+    }
+  }
+
 
   /// 특정 날짜의 총 근무시간 계산
   double getDayTotalHours(int day) {

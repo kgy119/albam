@@ -19,31 +19,63 @@ class HomeView extends GetView<WorkplaceController> {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await authService.signOut();
-              Get.offAllNamed(AppRoutes.login);
-            },
+            onPressed: () => _showLogoutDialog(authService),
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: controller.loadWorkplaces,
-        child: Obx(() {
-          if (controller.isLoading.value) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: controller.loadWorkplaces,
+          child: Obx(() {
+            if (controller.isLoading.value) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          if (controller.workplaces.isEmpty) {
-            return _buildEmptyState(context);
-          }
+            if (controller.workplaces.isEmpty) {
+              return _buildEmptyState(context);
+            }
 
-          return _buildWorkplaceList(context);
-        }),
+            return _buildWorkplaceList(context);
+          }),
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddWorkplaceDialog(),
         child: const Icon(Icons.add),
       ),
+    );
+  }
+
+  // 로그아웃 다이얼로그 별도 메서드로 분리
+  void _showLogoutDialog(AuthService authService) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('로그아웃'),
+        content: const Text('로그아웃 하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Get.back(); // 다이얼로그만 닫기
+            },
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Get.back(); // 다이얼로그 먼저 닫기
+
+              // 약간의 딜레이 후 로그아웃 실행
+              await Future.delayed(const Duration(milliseconds: 300));
+
+              await authService.signOut();
+
+              // 로그인 화면으로 이동
+              Get.offAllNamed(AppRoutes.login);
+            },
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+      barrierDismissible: false, // 바깥 영역 터치로 닫기 방지
     );
   }
 
@@ -173,20 +205,20 @@ class HomeView extends GetView<WorkplaceController> {
 
               // 사업장 정보 요약
               Obx(() => Row(
-                  children: [
-                    _buildInfoChip(
-                      icon: Icons.people,
-                      label: '직원 ${controller.getEmployeeCount(workplace.id)}명',
-                      color: Colors.blue,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildInfoChip(
-                      icon: Icons.schedule,
-                      label: '이번 달',
-                      color: Colors.green,
-                    ),
-                  ],
-                ),
+                children: [
+                  _buildInfoChip(
+                    icon: Icons.people,
+                    label: '직원 ${controller.getEmployeeCount(workplace.id)}명',
+                    color: Colors.blue,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildInfoChip(
+                    icon: Icons.schedule,
+                    label: '이번 달',
+                    color: Colors.green,
+                  ),
+                ],
+              ),
               ),
             ],
           ),
@@ -266,8 +298,9 @@ class HomeView extends GetView<WorkplaceController> {
             onPressed: () async {
               final newName = nameController.text.trim();
               if (newName.isNotEmpty) {
+                Get.back(); // 다이얼로그 먼저 닫기
+                await Future.delayed(const Duration(milliseconds: 200));
                 await controller.updateWorkplaceName(workplaceId, newName);
-                Get.back();
               }
             },
             child: const Text('수정'),
@@ -291,8 +324,9 @@ class HomeView extends GetView<WorkplaceController> {
           ),
           ElevatedButton(
             onPressed: () async {
+              Get.back(); // 다이얼로그 먼저 닫기
+              await Future.delayed(const Duration(milliseconds: 200));
               await controller.deleteWorkplace(workplaceId);
-              Get.back();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,

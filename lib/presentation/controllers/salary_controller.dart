@@ -10,17 +10,15 @@ class SalaryController extends GetxController {
 
   RxBool isLoading = false.obs;
   Rxn<Map<String, dynamic>> salaryData = Rxn<Map<String, dynamic>>();
+  Rxn<Employee> currentEmployee = Rxn<Employee>(); // 현재 직원 정보 저장
 
   RxList<Schedule> monthlySchedules = <Schedule>[].obs;
-
-  // 추가: 선택된 날짜
   RxInt selectedDay = 0.obs;
 
   @override
   void onInit() {
     super.onInit();
 
-    // Get.arguments로 전달받은 데이터 자동 처리
     final arguments = Get.arguments as Map<String, dynamic>?;
     if (arguments != null) {
       final employee = arguments['employee'];
@@ -28,6 +26,7 @@ class SalaryController extends GetxController {
       final month = arguments['month'];
 
       if (employee != null && year != null && month != null) {
+        currentEmployee.value = employee;
         calculateEmployeeSalary(
           employee: employee,
           year: year,
@@ -45,12 +44,26 @@ class SalaryController extends GetxController {
   }) async {
     isLoading.value = true;
     try {
+      // 최신 직원 정보 다시 가져오기 (시급 변경 등 반영)
+      final employeeDoc = await _firestore
+          .collection(AppConstants.employeesCollection)
+          .doc(employee.id)
+          .get();
+
+      if (!employeeDoc.exists) {
+        Get.snackbar('오류', '직원 정보를 찾을 수 없습니다.');
+        return;
+      }
+
+      final latestEmployee = Employee.fromFirestore(employeeDoc);
+      currentEmployee.value = latestEmployee;
+
       final startOfMonth = DateTime(year, month, 1);
       final endOfMonth = DateTime(year, month + 1, 1);
 
       final querySnapshot = await _firestore
           .collection(AppConstants.schedulesCollection)
-          .where('employeeId', isEqualTo: employee.id)
+          .where('employeeId', isEqualTo: latestEmployee.id)
           .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
           .where('date', isLessThan: Timestamp.fromDate(endOfMonth))
           .orderBy('date')
@@ -60,13 +73,11 @@ class SalaryController extends GetxController {
           .map((doc) => Schedule.fromFirestore(doc))
           .toList();
 
-      // 스케줄 목록 저장
       monthlySchedules.value = schedules;
 
-      // 급여 계산
       salaryData.value = SalaryCalculator.calculateMonthlySalary(
         schedules: schedules,
-        hourlyWage: employee.hourlyWage.toDouble(),
+        hourlyWage: latestEmployee.hourlyWage.toDouble(),
       );
 
     } catch (e) {
@@ -77,7 +88,6 @@ class SalaryController extends GetxController {
     }
   }
 
-  // 추가: 특정 날짜의 총 근무시간 계산
   double getDayTotalHours(int day, int year, int month) {
     final targetDate = DateTime(year, month, day);
 
@@ -97,7 +107,6 @@ class SalaryController extends GetxController {
     return totalHours;
   }
 
-  // 추가: 특정 날짜의 스케줄 목록
   List<Schedule> getDaySchedules(int day, int year, int month) {
     final targetDate = DateTime(year, month, day);
 
@@ -111,18 +120,15 @@ class SalaryController extends GetxController {
     }).toList();
   }
 
-  // 추가: 월의 일수 계산
   int getDaysInMonth(int year, int month) {
     return DateTime(year, month + 1, 0).day;
   }
 
-  // 추가: 월의 첫째 날 요일
   int getFirstDayOfWeek(int year, int month) {
     final firstDay = DateTime(year, month, 1);
     return firstDay.weekday;
   }
 
-  // 추가: 일자 선택
   void selectDay(int day) {
     selectedDay.value = day;
   }

@@ -1,12 +1,14 @@
 import 'package:get/get.dart';
 
 import '../../presentation/controllers/add_employee_controller.dart';
+import '../../presentation/controllers/monthly_salary_summary_controller.dart';
 import '../../presentation/controllers/salary_controller.dart';
 import '../../presentation/controllers/schedule_setting_controller.dart';
 import '../../presentation/controllers/workplace_detail_controller.dart';
 import '../../presentation/views/employee/add_employee_view.dart';
 import '../../presentation/views/employee/edit_employee_view.dart';
 import '../../presentation/views/employee/employee_list_view.dart';
+import '../../presentation/views/salary/monthly_salary_summary_view.dart';
 import '../../presentation/views/salary/salary_view.dart';
 import '../../presentation/views/schedule/schedule_setting_view.dart';
 import '../../presentation/views/workplace/workplace_detail_view.dart';
@@ -68,6 +70,14 @@ class AppPages {
       name: AppRoutes.editEmployee,
       page: () => const EditEmployeeView(),
     ),
-
+    GetPage(
+      name: AppRoutes.monthlySalarySummary,
+      page: () => const MonthlySalarySummaryView(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<MonthlySalarySummaryController>(
+              () => MonthlySalarySummaryController(),
+        );
+      }),
+    ),
   ];
 }

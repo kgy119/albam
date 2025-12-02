@@ -8,28 +8,34 @@ class SalaryCalculator {
     required double hourlyWage,
   }) {
     double totalHours = 0;
+    double regularHours = 0;
+    double substituteHours = 0;
     double weeklyHolidayHours = 0;
 
-    // 주별 근무 정리 (대체근무 제외)
+    int regularDays = 0;
+    int substituteDays = 0;
+
     Map<int, Map<DateTime, double>> weeklySchedules = {};
     Map<DateTime, double> dailyHours = {};
-
-    // 대체근무 시간 따로 계산
-    double substituteHours = 0;
 
     for (var schedule in schedules) {
       final date = DateTime(schedule.date.year, schedule.date.month, schedule.date.day);
       final hours = schedule.totalMinutes / 60.0;
 
-      // 일별 근무시간 누적 (모든 근무시간 포함)
       dailyHours[date] = (dailyHours[date] ?? 0) + hours;
       totalHours += hours;
 
       if (schedule.isSubstitute) {
-        // 대체근무 시간은 따로 계산
         substituteHours += hours;
+        if (!dailyHours.containsKey(date) || dailyHours[date] == hours) {
+          substituteDays++;
+        }
       } else {
-        // 정규근무만 주휴수당 계산에 포함
+        regularHours += hours;
+        if (!dailyHours.containsKey(date) || dailyHours[date] == hours) {
+          regularDays++;
+        }
+
         int weekNumber = _getWeekOfMonth(date);
         weeklySchedules[weekNumber] ??= {};
         weeklySchedules[weekNumber]![date] =
@@ -37,22 +43,21 @@ class SalaryCalculator {
       }
     }
 
-    // 주휴수당 계산 (정규근무만 포함)
     weeklyHolidayHours = _calculateWeeklyHolidayHours(weeklySchedules);
 
-    // 급여 계산
-    double basicPay = totalHours * hourlyWage; // 전체 시간으로 기본급 계산
+    double basicPay = totalHours * hourlyWage;
     double weeklyHolidayPay = weeklyHolidayHours * hourlyWage;
     double totalPay = basicPay + weeklyHolidayPay;
 
-    // 세금 계산 (3.3%)
     double tax = totalPay * 0.033;
     double netPay = totalPay - tax;
 
     return {
       'totalHours': totalHours,
-      'regularHours': totalHours - substituteHours, // 정규근무 시간
-      'substituteHours': substituteHours, // 대체근무 시간
+      'regularHours': regularHours,
+      'substituteHours': substituteHours,
+      'regularDays': regularDays,        // 추가
+      'substituteDays': substituteDays,  // 추가
       'weeklyHolidayHours': weeklyHolidayHours,
       'basicPay': basicPay,
       'weeklyHolidayPay': weeklyHolidayPay,

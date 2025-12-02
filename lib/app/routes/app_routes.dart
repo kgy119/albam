@@ -9,4 +9,5 @@ abstract class AppRoutes {
   static const calendar = '/calendar';
   static const scheduleSetting = '/schedule-setting';
   static const salaryView = '/salary-view';
+  static const monthlySalarySummary = '/monthly-salary-summary';
 }

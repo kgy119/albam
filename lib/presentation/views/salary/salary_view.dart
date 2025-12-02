@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../../app/routes/app_routes.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../controllers/salary_controller.dart';
 import '../../../data/models/employee_model.dart';
@@ -21,8 +22,31 @@ class SalaryView extends GetView<SalaryController> {
     return Scaffold(
       appBar: AppBar(
         title: Text('${employee.name} - $year년 $month월 급여'),
+        actions: [
+          // 직원 정보 수정 버튼 추가
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () async {
+              final result = await Get.toNamed(
+                AppRoutes.editEmployee,
+                arguments: employee,
+              );
+
+              // 수정 완료 후 돌아왔을 때 급여 재계산
+              if (result == true) {
+                // 직원 정보가 변경되었으므로 급여 다시 계산
+                controller.calculateEmployeeSalary(
+                  employee: employee,
+                  year: year,
+                  month: month,
+                );
+              }
+            },
+            tooltip: '직원 정보 수정',
+          ),
+        ],
       ),
-      body: SafeArea( // SafeArea 추가
+      body: SafeArea(
         child: Obx(() {
           if (controller.isLoading.value) {
             return const Center(child: CircularProgressIndicator());
@@ -40,7 +64,7 @@ class SalaryView extends GetView<SalaryController> {
               16,
               16,
               16,
-              16 + MediaQuery.of(context).padding.bottom, // 하단 패딩 추가
+              16 + MediaQuery.of(context).padding.bottom,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,12 +107,43 @@ class SalaryView extends GetView<SalaryController> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '직원 정보',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '직원 정보',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                // 수정 버튼 추가
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final result = await Get.toNamed(
+                      AppRoutes.editEmployee,
+                      arguments: employee,
+                    );
+
+                    if (result == true) {
+                      // 페이지 새로고침을 위해 Get.back 후 다시 진입
+                      Get.snackbar(
+                        '알림',
+                        '직원 정보가 수정되었습니다. 변경된 시급으로 다시 계산하려면 해당 월을 다시 조회해주세요.',
+                        snackPosition: SnackPosition.BOTTOM,
+                        backgroundColor: Colors.orange,
+                        colorText: Colors.white,
+                        duration: const Duration(seconds: 3),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.edit, size: 16),
+                  label: const Text('수정'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             _buildInfoRow('이름', employee.name),
@@ -152,6 +207,7 @@ class SalaryView extends GetView<SalaryController> {
       ),
     );
   }
+
 
   Widget _buildCalendarCard(int year, int month, BuildContext context) {
     return Card(
@@ -437,6 +493,26 @@ class SalaryView extends GetView<SalaryController> {
               '총 근무시간',
               '${salaryData['totalHours'].toStringAsFixed(1)} 시간',
               valueColor: Theme.of(context).primaryColor,
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 16),
+              child: Column(
+                children: [
+                  _buildInfoRow(
+                    '∙ 정규근무',
+                    '${salaryData['regularHours'].toStringAsFixed(1)}h (${salaryData['regularDays']}일)',
+                    fontSize: 12,
+                  ),
+                  const SizedBox(height: 4),
+                  _buildInfoRow(
+                    '∙ 대체근무',
+                    '${salaryData['substituteHours'].toStringAsFixed(1)}h (${salaryData['substituteDays']}일)',
+                    fontSize: 12,
+                    valueColor: Colors.orange,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 8),
             _buildInfoRow(
