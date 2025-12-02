@@ -46,36 +46,37 @@ class HomeView extends GetView<WorkplaceController> {
     );
   }
 
-  // 로그아웃 다이얼로그 별도 메서드로 분리
   void _showLogoutDialog(AuthService authService) {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('로그아웃'),
-        content: const Text('로그아웃 하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Get.back(); // 다이얼로그만 닫기
-            },
-            child: const Text('취소'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Get.back(); // 다이얼로그 먼저 닫기
+    showDialog(
+      context: Get.context!,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('로그아웃'),
+          content: const Text('로그아웃 하시겠습니까?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop(); // 다이얼로그 먼저 닫기
 
-              // 약간의 딜레이 후 로그아웃 실행
-              await Future.delayed(const Duration(milliseconds: 300));
+                await Future.delayed(const Duration(milliseconds: 200));
 
-              await authService.signOut();
+                await authService.signOut();
 
-              // 로그인 화면으로 이동
-              Get.offAllNamed(AppRoutes.login);
-            },
-            child: const Text('확인'),
-          ),
-        ],
-      ),
-      barrierDismissible: false, // 바깥 영역 터치로 닫기 방지
+                // 로그인 화면으로 이동
+                Get.offAllNamed(AppRoutes.login);
+              },
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -279,63 +280,71 @@ class HomeView extends GetView<WorkplaceController> {
     final workplace = controller.workplaces.firstWhere((w) => w.id == workplaceId);
     final TextEditingController nameController = TextEditingController(text: workplace.name);
 
-    Get.dialog(
-      AlertDialog(
-        title: const Text('사업장 이름 수정'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(
-            labelText: '사업장 이름',
+    showDialog(
+      context: Get.context!,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('사업장 이름 수정'),
+          content: TextField(
+            controller: nameController,
+            decoration: const InputDecoration(
+              labelText: '사업장 이름',
+            ),
+            autofocus: true,
           ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('취소'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final newName = nameController.text.trim();
-              if (newName.isNotEmpty) {
-                Get.back(); // 다이얼로그 먼저 닫기
-                await Future.delayed(const Duration(milliseconds: 200));
-                await controller.updateWorkplaceName(workplaceId, newName);
-              }
-            },
-            child: const Text('수정'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final newName = nameController.text.trim();
+                if (newName.isNotEmpty) {
+                  Navigator.of(context).pop(); // Get.back() 대신 사용
+                  await Future.delayed(const Duration(milliseconds: 200));
+                  await controller.updateWorkplaceName(workplaceId, newName);
+                }
+              },
+              child: const Text('수정'),
+            ),
+          ],
+        );
+      },
     );
   }
 
   void _showDeleteConfirmDialog(String workplaceId) {
     final workplace = controller.workplaces.firstWhere((w) => w.id == workplaceId);
 
-    Get.dialog(
-      AlertDialog(
-        title: const Text('사업장 삭제'),
-        content: Text('\'${workplace.name}\' 사업장을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.'),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('취소'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Get.back(); // 다이얼로그 먼저 닫기
-              await Future.delayed(const Duration(milliseconds: 200));
-              await controller.deleteWorkplace(workplaceId);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+    showDialog(
+      context: Get.context!,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('사업장 삭제'),
+          content: Text('\'${workplace.name}\' 사업장을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('취소'),
             ),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop(); // Get.back() 대신 사용
+                await Future.delayed(const Duration(milliseconds: 200));
+                await controller.deleteWorkplace(workplaceId);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

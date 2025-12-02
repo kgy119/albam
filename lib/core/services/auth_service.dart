@@ -262,12 +262,18 @@ class AuthService extends GetxService {
 
       // Google, Firebase, Kakao 로그아웃을 병렬로 처리
       await Future.wait([
-        _googleSignIn.signOut().catchError((e) => print('Google 로그아웃 오류 (무시): $e')),
-        _auth.signOut().catchError((e) => print('Firebase 로그아웃 오류 (무시): $e')),
+        _googleSignIn.signOut().catchError((e) {
+          print('Google 로그아웃 오류 (무시): $e');
+          return null; // 반환값 추가
+        }),
+        _auth.signOut().catchError((e) {
+          print('Firebase 로그아웃 오류 (무시): $e');
+          return null; // 반환값 추가
+        }),
         // Kakao 로그아웃은 오류 발생 시 무시
         UserApi.instance.logout().catchError((e) {
           print('카카오 로그아웃 오류 (무시): $e');
-          return null;
+          return Future.value(); // Future.value()로 수정
         }),
       ]);
 
@@ -276,7 +282,7 @@ class AuthService extends GetxService {
 
     } catch (e) {
       print('로그아웃 오류: $e');
-      Get.snackbar('오류', '로그아웃 중 오류가 발생했습니다.');
+      // 스낵바 제거 - 로그아웃은 에러가 나도 진행되어야 함
     }
   }
 

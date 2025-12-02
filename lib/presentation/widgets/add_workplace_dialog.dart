@@ -55,7 +55,11 @@ class AddWorkplaceDialog extends StatelessWidget {
       return;
     }
 
+    // 먼저 다이얼로그 닫기
+    Navigator.of(Get.context!).pop();
+
+    // 약간의 딜레이 후 사업장 추가
+    await Future.delayed(const Duration(milliseconds: 200));
     await _controller.addWorkplace(name);
-    Get.back(); // 다이얼로그 닫기
   }
 }
