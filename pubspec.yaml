@@ -1,5 +1,5 @@
 name: albam
-description: "A alba manage project."
+description: 알밤 - 알바 매니저
 publish_to: 'none'
 
 version: 1.0.0+1
