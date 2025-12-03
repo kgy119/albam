@@ -1,3 +1,5 @@
+// lib/core/services/auth_service.dart
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:get/get.dart';
@@ -35,7 +37,7 @@ class AuthService extends GetxService {
   }
 
   /// Google 로그인
-  Future<UserCredential?> signInWithGoogle() async {
+  Future<Map<String, dynamic>> signInWithGoogle() async {
     try {
       print('Google 로그인 시작');
 
@@ -43,7 +45,7 @@ class AuthService extends GetxService {
 
       if (googleUser == null) {
         print('사용자가 Google 로그인을 취소함');
-        return null;
+        return {'success': false};
       }
 
       print('Google 사용자 정보 획득: ${googleUser.email}');
@@ -69,15 +71,87 @@ class AuthService extends GetxService {
         profileImage: userCredential.user!.photoURL,
       );
 
-      return userCredential;
+      return {'success': true, 'user': userCredential};
     } on FirebaseAuthException catch (e) {
       print('Google 로그인 오류: ${e.code} / ${e.message}');
-      _handleAuthError(e);
-      return null;
+      return {'success': false, 'error': _getErrorMessage(e)};
     } catch (e) {
       print('Google 로그인 일반 오류: $e');
-      Get.snackbar('오류', 'Google 로그인 중 오류가 발생했습니다.');
-      return null;
+      return {'success': false, 'error': 'Google 로그인 중 오류가 발생했습니다.'};
+    }
+  }
+
+  /// 이메일/비밀번호 로그인
+  Future<Map<String, dynamic>> signInWithEmail(String email, String password) async {
+    try {
+      print('이메일 로그인 시작: $email');
+
+      final UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+
+      print('이메일 로그인 완료: ${userCredential.user?.uid}');
+
+      await _saveOrUpdateUser(
+        userCredential.user!,
+        'email',
+        email: userCredential.user!.email,
+      );
+
+      return {'success': true, 'user': userCredential};
+    } on FirebaseAuthException catch (e) {
+      print('이메일 로그인 오류: ${e.code} / ${e.message}');
+      return {'success': false, 'error': _getErrorMessage(e)};
+    } catch (e) {
+      print('이메일 로그인 일반 오류: $e');
+      return {'success': false, 'error': '로그인 중 오류가 발생했습니다.'};
+    }
+  }
+
+  /// 이메일/비밀번호 회원가입
+  Future<Map<String, dynamic>> signUpWithEmail(String email, String password) async {
+    try {
+      print('이메일 회원가입 시작: $email');
+
+      final UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+
+      print('이메일 회원가입 완료: ${userCredential.user?.uid}');
+
+      await _saveOrUpdateUser(
+        userCredential.user!,
+        'email',
+        email: userCredential.user!.email,
+      );
+
+      return {'success': true, 'user': userCredential};
+    } on FirebaseAuthException catch (e) {
+      print('이메일 회원가입 오류: ${e.code} / ${e.message}');
+      return {'success': false, 'error': _getErrorMessage(e)};
+    } catch (e) {
+      print('이메일 회원가입 일반 오류: $e');
+      return {'success': false, 'error': '회원가입 중 오류가 발생했습니다.'};
+    }
+  }
+
+  /// 비밀번호 재설정 이메일 전송
+  Future<Map<String, dynamic>> sendPasswordResetEmail(String email) async {
+    try {
+      print('비밀번호 재설정 이메일 전송: $email');
+
+      await _auth.sendPasswordResetEmail(email: email.trim());
+
+      print('비밀번호 재설정 이메일 전송 완료');
+      return {'success': true};
+    } on FirebaseAuthException catch (e) {
+      print('비밀번호 재설정 오류: ${e.code} / ${e.message}');
+      return {'success': false, 'error': _getErrorMessage(e)};
+    } catch (e) {
+      print('비밀번호 재설정 일반 오류: $e');
+      return {'success': false, 'error': '비밀번호 재설정 중 오류가 발생했습니다.'};
     }
   }
 
@@ -129,45 +203,34 @@ class AuthService extends GetxService {
     }
   }
 
-  /// Firebase Auth 오류 처리
-  void _handleAuthError(FirebaseAuthException e) {
-    String message = '';
-
+  /// 에러 메시지 가져오기
+  String _getErrorMessage(FirebaseAuthException e) {
     switch (e.code) {
       case 'account-exists-with-different-credential':
-        message = '다른 로그인 방법으로 이미 등록된 계정입니다.';
-        break;
+        return '다른 로그인 방법으로 이미 등록된 계정입니다.';
       case 'invalid-credential':
-        message = '유효하지 않은 인증 정보입니다.';
-        break;
+        return '등록되지 않은 이메일이거나 비밀번호가 올바르지 않습니다.';
       case 'operation-not-allowed':
-        message = '해당 로그인 방법이 비활성화되어 있습니다.';
-        break;
+        return '해당 로그인 방법이 비활성화되어 있습니다.';
       case 'user-disabled':
-        message = '비활성화된 계정입니다.';
-        break;
+        return '비활성화된 계정입니다.';
       case 'user-not-found':
-        message = '등록되지 않은 이메일입니다.';
-        break;
+        return '등록되지 않은 회원입니다. 회원가입을 먼저 진행해주세요.';
       case 'wrong-password':
-        message = '잘못된 비밀번호입니다.';
-        break;
+        return '비밀번호가 올바르지 않습니다.';
       case 'invalid-email':
-        message = '유효하지 않은 이메일 형식입니다.';
-        break;
+        return '유효하지 않은 이메일 형식입니다.';
       case 'email-already-in-use':
-        message = '이미 사용 중인 이메일입니다.';
-        break;
+        return '이미 사용 중인 이메일입니다.';
       case 'weak-password':
-        message = '비밀번호가 너무 약합니다.';
-        break;
+        return '비밀번호가 너무 약합니다. 6자 이상 입력해주세요.';
       case 'too-many-requests':
-        message = '너무 많은 시도가 있었습니다. 잠시 후 다시 시도해주세요.';
-        break;
+        return '너무 많은 시도가 있었습니다. 잠시 후 다시 시도해주세요.';
+      case 'network-request-failed':
+        return '네트워크 연결을 확인해주세요.';
       default:
-        message = '인증 오류: ${e.message}';
+        return '로그인에 실패했습니다. 다시 시도해주세요.';
     }
-
-    Get.snackbar('오류', message);
   }
+
 }

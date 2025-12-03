@@ -1,3 +1,5 @@
+// lib/presentation/controllers/auth_controller.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/services/auth_service.dart';
@@ -6,12 +8,80 @@ import '../../app/routes/app_routes.dart';
 class AuthController extends GetxController {
   final AuthService _authService = Get.find<AuthService>();
 
+  // 로딩 상태
   RxBool isGoogleLoading = false.obs;
+  RxBool isEmailLoading = false.obs;
+
+  // 이메일 폼 컨트롤러
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  final passwordConfirmController = TextEditingController();
+
+  // 유효성 검사
+  RxBool isEmailValid = false.obs;
+  RxBool isPasswordValid = false.obs;
+  RxBool isPasswordConfirmValid = false.obs;
+
+  // 회원가입 모드
+  RxBool isSignUpMode = false.obs;
+
+  // 비밀번호 찾기 상태
+  RxBool isResetMode = false.obs;
+
+  // 에러 메시지
+  RxString errorMessage = ''.obs;
+  RxString successMessage = ''.obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+
+    // 이메일 유효성 검사
+    emailController.addListener(() {
+      isEmailValid.value = _validateEmail(emailController.text);
+      if (errorMessage.value.isNotEmpty) {
+        errorMessage.value = '';
+      }
+    });
+
+    // 비밀번호 유효성 검사
+    passwordController.addListener(() {
+      isPasswordValid.value = _validatePassword(passwordController.text);
+      if (isSignUpMode.value) {
+        isPasswordConfirmValid.value =
+            passwordController.text == passwordConfirmController.text &&
+                passwordConfirmController.text.isNotEmpty;
+      }
+      if (errorMessage.value.isNotEmpty) {
+        errorMessage.value = '';
+      }
+    });
+
+    // 비밀번호 확인 유효성 검사
+    passwordConfirmController.addListener(() {
+      if (isSignUpMode.value) {
+        isPasswordConfirmValid.value =
+            passwordController.text == passwordConfirmController.text &&
+                passwordConfirmController.text.isNotEmpty;
+      }
+      if (errorMessage.value.isNotEmpty) {
+        errorMessage.value = '';
+      }
+    });
+  }
 
   @override
   void onReady() {
     super.onReady();
     _setupAuthStateListener();
+  }
+
+  @override
+  void onClose() {
+    emailController.dispose();
+    passwordController.dispose();
+    passwordConfirmController.dispose();
+    super.onClose();
   }
 
   void _setupAuthStateListener() {
@@ -40,20 +110,147 @@ class AuthController extends GetxController {
     }
   }
 
+  bool _validateEmail(String email) {
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    return emailRegex.hasMatch(email.trim());
+  }
+
+  bool _validatePassword(String password) {
+    return password.length >= 6;
+  }
+
+  bool get canSubmit {
+    if (isSignUpMode.value) {
+      return isEmailValid.value &&
+          isPasswordValid.value &&
+          isPasswordConfirmValid.value;
+    } else {
+      return isEmailValid.value && isPasswordValid.value;
+    }
+  }
+
+  void toggleSignUpMode() {
+    isSignUpMode.value = !isSignUpMode.value;
+    if (isSignUpMode.value) {
+      isResetMode.value = false;
+    }
+    passwordConfirmController.clear();
+    isPasswordConfirmValid.value = false;
+    errorMessage.value = '';
+    successMessage.value = '';
+  }
+
+  void toggleResetMode() {
+    isResetMode.value = !isResetMode.value;
+    if (isResetMode.value) {
+      isSignUpMode.value = false;
+    }
+    passwordController.clear();
+    passwordConfirmController.clear();
+    isPasswordValid.value = false;
+    isPasswordConfirmValid.value = false;
+    errorMessage.value = '';
+    successMessage.value = '';
+  }
+
+  /// 이메일 로그인
+  Future<void> signInWithEmail() async {
+    if (isEmailLoading.value || !canSubmit) return;
+
+    try {
+      isEmailLoading.value = true;
+      errorMessage.value = '';
+      successMessage.value = '';
+
+      final result = await _authService.signInWithEmail(
+        emailController.text.trim(),
+        passwordController.text,
+      );
+
+      if (result['success'] == true) {
+        successMessage.value = '로그인이 완료되었습니다.';
+      } else if (result['error'] != null) {
+        errorMessage.value = result['error'];
+      }
+    } finally {
+      isEmailLoading.value = false;
+    }
+  }
+
+  /// 이메일 회원가입
+  Future<void> signUpWithEmail() async {
+    if (isEmailLoading.value || !canSubmit) return;
+
+    try {
+      isEmailLoading.value = true;
+      errorMessage.value = '';
+      successMessage.value = '';
+
+      final result = await _authService.signUpWithEmail(
+        emailController.text.trim(),
+        passwordController.text,
+      );
+
+      if (result['success'] == true) {
+        successMessage.value = '회원가입이 완료되었습니다.';
+      } else if (result['error'] != null) {
+        errorMessage.value = result['error'];
+      }
+    } finally {
+      isEmailLoading.value = false;
+    }
+  }
+
+  /// 비밀번호 재설정 이메일 전송
+  Future<void> sendPasswordResetEmail() async {
+    if (!isEmailValid.value) {
+      errorMessage.value = '올바른 이메일을 입력해주세요.';
+      return;
+    }
+
+    try {
+      isEmailLoading.value = true;
+      errorMessage.value = '';
+      successMessage.value = '';
+
+      final result = await _authService.sendPasswordResetEmail(
+        emailController.text.trim(),
+      );
+
+      if (result['success'] == true) {
+        successMessage.value = '비밀번호 재설정 이메일이 전송되었습니다.\n이메일을 확인해주세요.';
+
+        // 3초 후 로그인 화면으로 전환
+        Future.delayed(const Duration(seconds: 3), () {
+          isResetMode.value = false;
+          successMessage.value = '';
+        });
+      } else if (result['error'] != null) {
+        errorMessage.value = result['error'];
+      }
+    } finally {
+      isEmailLoading.value = false;
+    }
+  }
+
   /// Google 로그인
   Future<void> signInWithGoogle() async {
     if (isGoogleLoading.value) return;
 
     try {
       isGoogleLoading.value = true;
+      errorMessage.value = '';
+      successMessage.value = '';
 
       final result = await _authService.signInWithGoogle();
 
-      if (result != null) {
-        Get.snackbar('성공', 'Google 로그인이 완료되었습니다.');
+      if (result['success'] == true) {
+        successMessage.value = 'Google 로그인이 완료되었습니다.';
+      } else if (result['error'] != null) {
+        errorMessage.value = result['error'];
       }
     } catch (e) {
-      Get.snackbar('오류', 'Google 로그인 중 오류가 발생했습니다.');
+      errorMessage.value = 'Google 로그인 중 오류가 발생했습니다.';
       print('Google 로그인 오류: $e');
     } finally {
       isGoogleLoading.value = false;
