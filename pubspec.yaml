@@ -29,8 +29,6 @@ dependencies:
   # 기타 유틸
   intl: ^0.18.1
   image_picker: ^1.2.0
-  kakao_flutter_sdk: ^1.9.7+3
-  kakao_flutter_sdk_user: ^1.9.7+3
 
 dev_dependencies:
   flutter_test:

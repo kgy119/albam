@@ -108,62 +108,6 @@ class LoginView extends GetView<AuthController> {
                     ),
                   )),
 
-                  const SizedBox(height: 16),
-
-                  // 카카오 로그인 버튼
-                  Obx(() => SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: controller.isKakaoLoading.value
-                          ? null
-                          : controller.signInWithKakao,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFE812),
-                        foregroundColor: const Color(0xFF3C1E1E),
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: controller.isKakaoLoading.value
-                          ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Color(0xFF3C1E1E),
-                        ),
-                      )
-                          : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 24,
-                            height: 24,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF3C1E1E),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.chat_bubble,
-                              size: 14,
-                              color: Color(0xFFFFE812),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            '카카오톡으로 계속하기',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )),
-
                   const SizedBox(height: 48),
 
                   // 약관 동의 텍스트
