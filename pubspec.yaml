@@ -29,6 +29,7 @@ dependencies:
   # 기타 유틸
   intl: ^0.18.1
   image_picker: ^1.2.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

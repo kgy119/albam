@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -6,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/snackbar_helper.dart';
 import '../../controllers/workplace_detail_controller.dart';
 import '../../../data/models/employee_model.dart';
 
@@ -18,6 +20,7 @@ class EditEmployeeView extends StatefulWidget {
 
 class _EditEmployeeViewState extends State<EditEmployeeView> {
   final WorkplaceDetailController controller = Get.find<WorkplaceDetailController>();
+  bool _isImageDeleted = false;
 
   late Employee employee;
   final _formKey = GlobalKey<FormState>();
@@ -41,6 +44,9 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
     _wageController = TextEditingController(text: employee.hourlyWage.toString());
     _bankNameController = TextEditingController(text: employee.bankName ?? '');
     _accountNumberController = TextEditingController(text: employee.accountNumber ?? '');
+
+    // Firestore에서 최신 정보 가져오기
+    _loadLatestEmployeeInfo();
   }
 
   @override
@@ -51,6 +57,30 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
     _bankNameController.dispose();
     _accountNumberController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadLatestEmployeeInfo() async {
+    try {
+      final employeeArg = Get.arguments as Employee;
+
+      final doc = await FirebaseFirestore.instance
+          .collection(AppConstants.employeesCollection)
+          .doc(employeeArg.id)
+          .get();
+
+      if (doc.exists) {
+        setState(() {
+          employee = Employee.fromFirestore(doc);
+          _nameController.text = employee.name;
+          _phoneController.text = employee.phoneNumber;
+          _wageController.text = employee.hourlyWage.toString();
+          _bankNameController.text = employee.bankName ?? '';
+          _accountNumberController.text = employee.accountNumber ?? '';
+        });
+      }
+    } catch (e) {
+      print('최신 직원 정보 로드 오류: $e');
+    }
   }
 
   Future<void> _pickImage() async {
@@ -65,10 +95,11 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
       if (image != null) {
         setState(() {
           _newContractImage = File(image.path);
+          _isImageDeleted = false;
         });
       }
     } catch (e) {
-      Get.snackbar('오류', '이미지를 선택할 수 없습니다.');
+      SnackbarHelper.showError('이미지를 선택할 수 없습니다.');
     }
   }
 
@@ -100,7 +131,7 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
       return downloadUrl;
     } catch (e) {
       print('이미지 업로드 오류: $e');
-      Get.snackbar('오류', '이미지 업로드에 실패했습니다. 다시 시도해주세요.');
+      SnackbarHelper.showError('이미지 업로드에 실패했습니다. 다시 시도해주세요.');
       return null;
     } finally {
       setState(() {
@@ -117,9 +148,18 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
     });
 
     try {
-      // 새 이미지 업로드 처리
       String? newImageUrl = employee.contractImageUrl;
+
+      if (_isImageDeleted && employee.contractImageUrl != null) {
+        await _deleteContractImage(employee.contractImageUrl!);
+        newImageUrl = null;
+      }
+
       if (_newContractImage != null) {
+        if (employee.contractImageUrl != null && !_isImageDeleted) {
+          await _deleteContractImage(employee.contractImageUrl!);
+        }
+
         final uploadedUrl = await _uploadImage();
         if (uploadedUrl != null) {
           newImageUrl = uploadedUrl;
@@ -142,22 +182,23 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
       );
 
       if (success) {
-        Get.back(result: true);
-        Get.snackbar(
-          '완료',
-          '${_nameController.text.trim()} 직원 정보가 수정되었습니다.',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
+        final employeeName = _nameController.text.trim();
+
+        if (mounted) {
+          Navigator.of(context).pop(true);
+        }
+
+        SnackbarHelper.showSuccess('$employeeName 직원 정보가 수정되었습니다.');
       }
     } catch (e) {
       print('직원 수정 오류: $e');
-      Get.snackbar('오류', '직원 정보 수정에 실패했습니다.');
+      SnackbarHelper.showError('직원 정보 수정에 실패했습니다.');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -392,8 +433,8 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
                               ],
                             ),
                           ),
-                        ] else if (employee.contractImageUrl != null) ...[
-                          // 기존 이미지
+                        ] else if (employee.contractImageUrl != null && !_isImageDeleted) ...[
+                          // 기존 이미지 (삭제 표시되지 않은 경우만)
                           Container(
                             height: 200,
                             width: double.infinity,
@@ -401,28 +442,44 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
                               border: Border.all(color: Colors.grey[300]!),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                employee.contractImageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Center(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.error_outline, size: 48),
-                                        SizedBox(height: 8),
-                                        Text('이미지를 불러올 수 없습니다'),
-                                      ],
+                            child: Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    employee.contractImageUrl!,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Center(
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.error_outline, size: 48),
+                                            SizedBox(height: 8),
+                                            Text('이미지를 불러올 수 없습니다'),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: IconButton(
+                                    icon: const Icon(Icons.delete, color: Colors.white),
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: Colors.red,
                                     ),
-                                  );
-                                },
-                              ),
+                                    onPressed: _showDeleteImageDialog,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ] else ...[
-                          // 이미지 없음
+                          // 이미지 없음 (삭제된 경우도 여기 표시)
                           Container(
                             height: 150,
                             width: double.infinity,
@@ -431,15 +488,21 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
                               borderRadius: BorderRadius.circular(8),
                               color: Colors.grey[50],
                             ),
-                            child: const Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.image_not_supported, size: 48),
-                                  SizedBox(height: 8),
-                                  Text('근로계약서가 등록되지 않았습니다'),
-                                ],
-                              ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.image_not_supported, size: 48),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _isImageDeleted
+                                      ? '근로계약서가 삭제 예정입니다\n(저장 시 완전 삭제)'
+                                      : '근로계약서가 등록되지 않았습니다',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: _isImageDeleted ? Colors.orange[700] : null,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -469,5 +532,46 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
         ),
       ),
     );
+  }
+
+  void _showDeleteImageDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('근로계약서 삭제'),
+        content: const Text('첨부된 근로계약서를 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              setState(() {
+                _isImageDeleted = true;
+              });
+              SnackbarHelper.showWarning(
+                '근로계약서가 삭제 표시되었습니다. 저장 버튼을 눌러주세요.',
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteContractImage(String imageUrl) async {
+    try {
+      final ref = FirebaseStorage.instance.refFromURL(imageUrl);
+      await ref.delete();
+      print('Firebase Storage에서 이미지 삭제 완료');
+    } catch (e) {
+      print('이미지 삭제 오류 (무시 가능): $e');
+    }
   }
 }

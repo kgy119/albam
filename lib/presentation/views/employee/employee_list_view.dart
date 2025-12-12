@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../controllers/workplace_detail_controller.dart';
 import '../../../app/routes/app_routes.dart';
 import 'package:intl/intl.dart';
@@ -139,11 +141,27 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      Text(
-                        employee.phoneNumber,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
+                      InkWell(
+                        onTap: () => _makePhoneCall(employee.phoneNumber),
+                        onLongPress: () => _copyPhoneNumber(employee.phoneNumber),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.phone,
+                              size: 14,
+                              color: Colors.blue[700],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              employee.phoneNumber,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.blue[700],
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -251,6 +269,38 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
     );
   }
 
+  // 전화 걸기
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final cleanNumber = phoneNumber.replaceAll('-', '');
+    final Uri phoneUri = Uri(scheme: 'tel', path: cleanNumber);
+
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        // 전화 걸기가 안 되면 자동으로 복사
+        _copyPhoneNumber(phoneNumber);
+      }
+    } catch (e) {
+      // 오류 발생시 복사로 대체
+      _copyPhoneNumber(phoneNumber);
+    }
+  }
+
+// 전화번호 복사
+  void _copyPhoneNumber(String phoneNumber) {
+    Clipboard.setData(ClipboardData(text: phoneNumber));
+    Get.snackbar(
+      '복사완료',
+      '전화번호가 복사되었습니다.',
+      snackPosition: SnackPosition.BOTTOM,
+      duration: const Duration(seconds: 2),
+      backgroundColor: Colors.green,
+      colorText: Colors.white,
+      margin: const EdgeInsets.all(10),
+    );
+  }
+
   void _showDeleteDialog(employee) {
     Get.dialog(
       AlertDialog(
@@ -274,16 +324,23 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
     );
   }
 
-  void _showEditDialog(employee) {
-    Get.toNamed(
-      '/edit-employee', // 별도 화면으로 이동
-      arguments: employee,
-    )?.then((result) async {
-      if (result == true) {
-        // 수정 완료 시 목록 새로고침
-        await controller.loadEmployees();
-      }
-    });
+  void _showEditDialog(employee) async {
+    // ⭐ 최신 직원 정보 다시 가져오기
+    final latestEmployee = await controller.getLatestEmployeeInfo(employee.id);
+
+    if (latestEmployee == null) {
+      Get.snackbar('오류', '직원 정보를 불러올 수 없습니다.');
+      return;
+    }
+
+    final result = await Get.toNamed(
+      '/edit-employee',
+      arguments: latestEmployee, // ⭐ 최신 정보 전달
+    );
+
+    if (result == true) {
+      await controller.loadEmployees();
+    }
   }
 
   void _showSalaryDialog(employee) {

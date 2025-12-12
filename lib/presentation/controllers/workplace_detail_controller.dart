@@ -1,6 +1,8 @@
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/utils/snackbar_helper.dart';
 import '../../core/utils/salary_calculator.dart';
 import '../../data/models/workplace_model.dart';
 import '../../data/models/employee_model.dart';
@@ -28,7 +30,7 @@ class WorkplaceDetailController extends GetxController {
   // 월별 스케줄 데이터
   RxList<Schedule> monthlySchedules = <Schedule>[].obs;
 
-  // 월별 통계 데이터 추가
+  // 월별 통계 데이터
   Rx<Map<String, dynamic>> monthlyStats = Rx<Map<String, dynamic>>({});
   RxBool isLoadingStats = false.obs;
 
@@ -42,11 +44,6 @@ class WorkplaceDetailController extends GetxController {
     loadMonthlySchedules();
 
     // 월 변경시 스케줄 다시 로드되도록 리스너 추가
-    ever(selectedDate, (date) {
-      loadMonthlySchedules();
-    });
-
-    // 월 변경시 통계도 다시 로드
     ever(selectedDate, (date) {
       loadMonthlySchedules();
       calculateMonthlyStats();
@@ -119,13 +116,7 @@ class WorkplaceDetailController extends GetxController {
       return true;
     } catch (e) {
       print('직원 추가 오류: $e');
-      Get.snackbar(
-        '오류',
-        '직원 등록에 실패했습니다. 다시 시도해주세요.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Get.theme.colorScheme.error,
-        colorText: Get.theme.colorScheme.onError,
-      );
+      SnackbarHelper.showError('직원 등록에 실패했습니다. 다시 시도해주세요.');
       return false;
     }
   }
@@ -137,8 +128,8 @@ class WorkplaceDetailController extends GetxController {
     required String phoneNumber,
     required int hourlyWage,
     String? contractImageUrl,
-    String? bankName,        // 추가
-    String? accountNumber,   // 추가
+    String? bankName,
+    String? accountNumber,
   }) async {
     try {
       print('직원 수정 시작: $name');
@@ -147,15 +138,13 @@ class WorkplaceDetailController extends GetxController {
         'name': name,
         'phoneNumber': phoneNumber,
         'hourlyWage': hourlyWage,
-        'bankName': bankName,           // 추가
-        'accountNumber': accountNumber, // 추가
+        'bankName': bankName,
+        'accountNumber': accountNumber,
         'updatedAt': Timestamp.fromDate(DateTime.now()),
       };
 
-      // contractImageUrl이 제공된 경우만 업데이트
-      if (contractImageUrl != null) {
-        updateData['contractImageUrl'] = contractImageUrl;
-      }
+      // ⭐ contractImageUrl을 항상 업데이트 (null 포함)
+      updateData['contractImageUrl'] = contractImageUrl;
 
       await _firestore
           .collection(AppConstants.employeesCollection)
@@ -170,14 +159,7 @@ class WorkplaceDetailController extends GetxController {
       return true;
     } catch (e) {
       print('직원 수정 오류: $e');
-      Get.snackbar(
-        '오류',
-        '직원 정보 수정에 실패했습니다: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Get.theme.colorScheme.error,
-        colorText: Get.theme.colorScheme.onError,
-        duration: const Duration(seconds: 4),
-      );
+      SnackbarHelper.showError('직원 정보 수정에 실패했습니다: ${e.toString()}');
       return false;
     }
   }
@@ -204,7 +186,29 @@ class WorkplaceDetailController extends GetxController {
   /// 직원 삭제
   Future<bool> deleteEmployee(String employeeId) async {
     try {
-      // 관련 스케줄도 함께 삭제
+      // 1. 직원 정보 가져오기
+      final employeeDoc = await _firestore
+          .collection(AppConstants.employeesCollection)
+          .doc(employeeId)
+          .get();
+
+      if (employeeDoc.exists) {
+        final employeeData = employeeDoc.data() as Map<String, dynamic>;
+        final contractImageUrl = employeeData['contractImageUrl'] as String?;
+
+        // 2. 근로계약서 이미지 삭제
+        if (contractImageUrl != null && contractImageUrl.isNotEmpty) {
+          try {
+            final ref = FirebaseStorage.instance.refFromURL(contractImageUrl);
+            await ref.delete();
+            print('근로계약서 이미지 삭제 완료');
+          } catch (e) {
+            print('이미지 삭제 오류 (무시): $e');
+          }
+        }
+      }
+
+      // 3. 관련 스케줄 삭제
       final schedulesQuery = await _firestore
           .collection(AppConstants.schedulesCollection)
           .where('employeeId', isEqualTo: employeeId)
@@ -212,12 +216,11 @@ class WorkplaceDetailController extends GetxController {
 
       final batch = _firestore.batch();
 
-      // 스케줄 삭제
       for (var doc in schedulesQuery.docs) {
         batch.delete(doc.reference);
       }
 
-      // 직원 삭제
+      // 4. 직원 정보 삭제
       batch.delete(
         _firestore.collection(AppConstants.employeesCollection).doc(employeeId),
       );
@@ -225,11 +228,12 @@ class WorkplaceDetailController extends GetxController {
       await batch.commit();
 
       await loadEmployees();
-      Get.snackbar('성공', '직원이 삭제되었습니다.');
+
+      SnackbarHelper.showSuccess('직원이 삭제되었습니다.');
       return true;
     } catch (e) {
       print('직원 삭제 오류: $e');
-      Get.snackbar('오류', '직원 삭제에 실패했습니다.');
+      SnackbarHelper.showError('직원 삭제에 실패했습니다.');
       return false;
     }
   }
@@ -351,7 +355,6 @@ class WorkplaceDetailController extends GetxController {
     }
   }
 
-
   /// 특정 날짜의 총 근무시간 계산
   double getDayTotalHours(int day) {
     final targetDate = DateTime(selectedDate.value.year, selectedDate.value.month, day);
@@ -390,7 +393,7 @@ class WorkplaceDetailController extends GetxController {
   void changeMonth(int year, int month) {
     selectedDate.value = DateTime(year, month, 1);
     selectedDay.value = 0;
-    loadMonthlySchedules(); // 월 변경 시 스케줄 다시 로드
+    loadMonthlySchedules();
   }
 
   /// 일자 선택
@@ -409,5 +412,23 @@ class WorkplaceDetailController extends GetxController {
   int getFirstDayOfWeek() {
     final firstDay = DateTime(selectedDate.value.year, selectedDate.value.month, 1);
     return firstDay.weekday;
+  }
+
+  /// 최신 직원 정보 가져오기
+  Future<Employee?> getLatestEmployeeInfo(String employeeId) async {
+    try {
+      final doc = await _firestore
+          .collection(AppConstants.employeesCollection)
+          .doc(employeeId)
+          .get();
+
+      if (doc.exists) {
+        return Employee.fromFirestore(doc);
+      }
+      return null;
+    } catch (e) {
+      print('최신 직원 정보 조회 오류: $e');
+      return null;
+    }
   }
 }
