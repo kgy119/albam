@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../../app/theme/app_theme.dart';
 import '../../controllers/workplace_controller.dart';
 import '../../widgets/add_workplace_dialog.dart';
 import '../../../core/services/auth_service.dart';
@@ -122,36 +123,41 @@ class HomeView extends GetView<WorkplaceController> {
     );
   }
 
+  // _buildWorkplaceCard 메서드 수정
   Widget _buildWorkplaceCard(workplace, BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: () {
-          // 사업장 세부페이지로 이동
           Get.toNamed(AppRoutes.workplaceDetail, arguments: workplace);
         },
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
+                  // 아이콘 박스
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 56,
+                    height: 56,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).primaryColor,
+                          Theme.of(context).primaryColor.withOpacity(0.7),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Icon(
-                      Icons.business,
-                      color: Theme.of(context).primaryColor,
-                      size: 24,
+                    child: const Icon(
+                      Icons.store,
+                      color: Colors.white,
+                      size: 28,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,70 +165,103 @@ class HomeView extends GetView<WorkplaceController> {
                         Text(
                           workplace.name,
                           style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.5,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '생성일: ${DateFormat('yyyy.MM.dd').format(workplace.createdAt)}',
+                          DateFormat('yyyy.MM.dd 등록').format(workplace.createdAt),
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             color: Colors.grey[600],
+                            fontWeight: FontWeight.w400,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  PopupMenuButton(
-                    onSelected: (value) => _handleMenuSelection(value, workplace.id),
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit, size: 18),
-                            SizedBox(width: 8),
-                            Text('이름 수정'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, size: 18, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('삭제', style: TextStyle(color: Colors.red)),
-                          ],
-                        ),
-                      ),
-                    ],
+                  IconButton(
+                    icon: const Icon(Icons.more_vert),
+                    onPressed: () {
+                      // 메뉴 처리
+                    },
                   ),
                 ],
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
 
-              // 사업장 정보 요약
+              // 통계 정보
               Obx(() => Row(
                 children: [
-                  _buildInfoChip(
-                    icon: Icons.people,
-                    label: '직원 ${controller.getEmployeeCount(workplace.id)}명',
-                    color: Colors.blue,
+                  _buildStatChip(
+                    icon: Icons.people_outline,
+                    label: '직원',
+                    value: '${controller.getEmployeeCount(workplace.id)}명',
+                    color: Theme.of(context).primaryColor,
                   ),
-                  const SizedBox(width: 8),
-                  _buildInfoChip(
-                    icon: Icons.schedule,
+                  const SizedBox(width: 12),
+                  _buildStatChip(
+                    icon: Icons.calendar_today_outlined,
                     label: '이번 달',
-                    color: Colors.green,
+                    value: '관리중',
+                    color: AppTheme.successColor,
+                  ),
+                ],
+              )),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatChip({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: color.withOpacity(0.8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: color,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
               ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

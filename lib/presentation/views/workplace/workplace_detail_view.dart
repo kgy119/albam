@@ -56,41 +56,39 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
     );
   }
 
-  /// 월별 통계 카드
+  // _buildMonthlyStatsCard 메서드 수정
   Widget _buildMonthlyStatsCard() {
     return Obx(() {
       if (controller.isLoadingStats.value) {
         return Container(
           padding: const EdgeInsets.all(16),
-          child: const Center(
-            child: CircularProgressIndicator(),
-          ),
+          child: const Center(child: CircularProgressIndicator()),
         );
       }
 
       final stats = controller.monthlyStats.value;
-      if (stats.isEmpty) {
-        return const SizedBox.shrink();
-      }
+      if (stats.isEmpty) return const SizedBox.shrink();
 
       final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '');
 
       return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
               Theme.of(Get.context!).primaryColor,
               Theme.of(Get.context!).primaryColor.withOpacity(0.8),
             ],
           ),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
               color: Theme.of(Get.context!).primaryColor.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
             ),
           ],
         ),
@@ -101,50 +99,88 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  '이번 달 통계',
+                  '이번 달 요약',
                   style: TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
-                    '직원 ${stats['employeeCount']}명',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.people, size: 14, color: Colors.white),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${stats['employeeCount']}명',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 20),
+
+            // 총 실수령액 (크게)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '총 실수령액',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${currencyFormat.format(stats['totalNetPay'])}원',
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             const SizedBox(height: 16),
+
+            // 2x2 그리드 통계
             Row(
               children: [
                 Expanded(
-                  child: _buildStatItem(
+                  child: _buildMiniStat(
                     '총 근무시간',
                     '${stats['totalHours'].toStringAsFixed(1)}h',
                     Icons.access_time,
                   ),
                 ),
-                Container(
-                  width: 1,
-                  height: 40,
-                  color: Colors.white.withOpacity(0.3),
-                ),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: _buildStatItem(
-                    '총 급여',
-                    '${currencyFormat.format(stats['totalNetPay'])}원',
-                    Icons.monetization_on,
+                  child: _buildMiniStat(
+                    '근무일수',
+                    '${stats['totalWorkDays']}일',
+                    Icons.calendar_today,
                   ),
                 ),
               ],
@@ -153,19 +189,15 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
             Row(
               children: [
                 Expanded(
-                  child: _buildStatItem(
-                    '근무일수',
-                    '${stats['totalWorkDays']}일',
-                    Icons.calendar_today,
+                  child: _buildMiniStat(
+                    '기본급',
+                    '${currencyFormat.format(stats['totalBasicPay'])}원',
+                    Icons.monetization_on,
                   ),
                 ),
-                Container(
-                  width: 1,
-                  height: 40,
-                  color: Colors.white.withOpacity(0.3),
-                ),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: _buildStatItem(
+                  child: _buildMiniStat(
                     '주휴수당',
                     '${currencyFormat.format(stats['totalWeeklyHolidayPay'])}원',
                     Icons.card_giftcard,
@@ -177,6 +209,45 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
         ),
       );
     });
+  }
+
+  Widget _buildMiniStat(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: Colors.white70),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildStatItem(String label, String value, IconData icon) {

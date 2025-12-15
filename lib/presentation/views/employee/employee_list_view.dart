@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../app/theme/app_theme.dart';
 import '../../controllers/workplace_detail_controller.dart';
 import '../../../app/routes/app_routes.dart';
 import 'package:intl/intl.dart';
@@ -107,163 +108,203 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
     );
   }
 
+  // employee_list_view.dart의 _buildEmployeeCard 수정
   Widget _buildEmployeeCard(employee) {
     final currencyFormatter = NumberFormat.currency(locale: 'ko_KR', symbol: '');
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Theme.of(Get.context!).primaryColor.withOpacity(0.1),
-                  child: Text(
-                    employee.name.isNotEmpty ? employee.name[0] : '?',
-                    style: TextStyle(
-                      color: Theme.of(Get.context!).primaryColor,
-                      fontWeight: FontWeight.bold,
+      child: InkWell(
+        onTap: () => _showSalaryDialog(employee),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  // 프로필 아바타
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.primaryColor,
+                          AppTheme.primaryLightColor,
+                        ],
+                      ),
+                      shape: BoxShape.circle,
                     ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        employee.name,
+                    child: Center(
+                      child: Text(
+                        employee.name.isNotEmpty ? employee.name[0] : '?',
                         style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 20,
                         ),
                       ),
-                      InkWell(
-                        onTap: () => _makePhoneCall(employee.phoneNumber),
-                        onLongPress: () => _copyPhoneNumber(employee.phoneNumber),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.phone,
-                              size: 14,
-                              color: Colors.blue[700],
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              employee.phoneNumber,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.blue[700],
-                                decoration: TextDecoration.underline,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          employee.name,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        InkWell(
+                          onTap: () => _makePhoneCall(employee.phoneNumber),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.phone_outlined,
+                                size: 14,
+                                color: AppTheme.primaryColor,
                               ),
-                            ),
+                              const SizedBox(width: 4),
+                              Text(
+                                employee.phoneNumber,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppTheme.primaryColor,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuButton(
+                    icon: const Icon(Icons.more_horiz),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        _showEditDialog(employee);
+                      } else if (value == 'delete') {
+                        _showDeleteDialog(employee);
+                      } else if (value == 'salary') {
+                        _showSalaryDialog(employee);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined, size: 18),
+                            SizedBox(width: 10),
+                            Text('정보 수정'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'salary',
+                        child: Row(
+                          children: [
+                            Icon(Icons.account_balance_wallet_outlined, size: 18),
+                            SizedBox(width: 10),
+                            Text('급여 조회'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                            SizedBox(width: 10),
+                            Text('삭제', style: TextStyle(color: Colors.red)),
                           ],
                         ),
                       ),
                     ],
                   ),
-                ),
-                PopupMenuButton(
-                  onSelected: (value) {
-                    if (value == 'edit') {
-                      _showEditDialog(employee);
-                    } else if (value == 'delete') {
-                      _showDeleteDialog(employee);
-                    } else if (value == 'salary') {
-                      _showSalaryDialog(employee);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
+                ],
+              ),
+
+              const SizedBox(height: 14),
+              const Divider(height: 1),
+              const SizedBox(height: 14),
+
+              // 시급 정보
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       child: Row(
                         children: [
-                          Icon(Icons.edit),
-                          SizedBox(width: 8),
-                          Text('정보 수정'),
+                          Icon(
+                            Icons.payments_outlined,
+                            size: 18,
+                            color: AppTheme.primaryColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '시급 ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.primaryColor.withOpacity(0.8),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            '${currencyFormatter.format(employee.hourlyWage)}원',
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: AppTheme.primaryColor,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
-                      value: 'salary',
-                      child: Row(
-                        children: [
-                          Icon(Icons.monetization_on),
-                          SizedBox(width: 8),
-                          Text('급여 조회'),
-                        ],
-                      ),
+                  ),
+                ],
+              ),
+
+              // 근로계약서 표시
+              if (employee.contractImageUrl != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.description_outlined,
+                      size: 14,
+                      color: AppTheme.successColor,
                     ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('삭제', style: TextStyle(color: Colors.red)),
-                        ],
+                    const SizedBox(width: 4),
+                    Text(
+                      '근로계약서 첨부됨',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.successColor,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ],
-            ),
-            const SizedBox(height: 12),
-
-            // 시급 정보
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(Get.context!).primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.access_time,
-                    size: 16,
-                    color: Theme.of(Get.context!).primaryColor,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '시급 ${currencyFormatter.format(employee.hourlyWage)}원',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(Get.context!).primaryColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // 근로계약서 첨부 여부
-            if (employee.contractImageUrl != null) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(
-                    Icons.attach_file,
-                    size: 16,
-                    color: Colors.green[600],
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '근로계약서 첨부됨',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.green[600],
-                    ),
-                  ),
-                ],
-              ),
             ],
-          ],
+          ),
         ),
       ),
     );
