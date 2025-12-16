@@ -293,14 +293,14 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
                               ),
                               const SizedBox(height: 16),
 
-                              // 시급
+                              // 시급 필드
                               TextFormField(
                                 controller: _wageController,
                                 decoration: InputDecoration(
                                   labelText: '시급',
                                   prefixIcon: const Icon(Icons.monetization_on),
                                   suffixText: '원',
-                                  helperText: '2025년 최저시급: ${currencyFormatter.format(AppConstants.minimumWage)}원',
+                                  helperText: '${DateTime.now().year}년 최저시급: ${currencyFormatter.format(AppConstants.getCurrentMinimumWage())}원',
                                 ),
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
@@ -311,8 +311,10 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
                                     return '시급을 입력해주세요';
                                   }
                                   final wage = int.tryParse(value);
-                                  if (wage == null || wage < AppConstants.minimumWage) {
-                                    return '최저시급(${currencyFormatter.format(AppConstants.minimumWage)}원) 이상을 입력해주세요';
+                                  final currentMinWage = AppConstants.getCurrentMinimumWage();
+
+                                  if (wage == null || wage < currentMinWage) {
+                                    return '최저시급(${currencyFormatter.format(currentMinWage)}원) 이상을 입력해주세요';
                                   }
                                   return null;
                                 },

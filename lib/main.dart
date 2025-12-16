@@ -9,6 +9,7 @@ import 'app/routes/app_routes.dart';
 import 'app/theme/app_theme.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/workplace_service.dart';
+import 'core/services/minimum_wage_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +24,7 @@ void main() async {
   // 서비스 등록
   await Get.putAsync(() => AuthService().init());
   Get.put(WorkplaceService());
+  await Get.putAsync(() => MinimumWageService().init());
 
   runApp(const MyApp());
 }

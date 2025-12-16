@@ -698,6 +698,10 @@ class SalaryView extends GetView<SalaryController> {
   }
 
   Widget _buildInfoBox() {
+    final now = DateTime.now();
+    final currentYear = now.year;
+    final currentMinWage = AppConstants.getCurrentMinimumWage();
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -710,7 +714,7 @@ class SalaryView extends GetView<SalaryController> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '일용직 급여 계산\n• 기본급: 시급 × 근무시간\n• 주휴수당: 주 15시간 이상 근무 시 지급 (일평균 근무시간, 최대 8시간)',
+              '일용직 급여 계산 ($currentYear년 최저시급: ${NumberFormat.currency(locale: 'ko_KR', symbol: '').format(currentMinWage)}원)\n• 기본급: 시급 × 근무시간\n• 주휴수당: 주 15시간 이상 근무 시 지급 (일평균 근무시간, 최대 8시간)',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.blue[700],

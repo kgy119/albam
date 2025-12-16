@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:intl/intl.dart';
 import 'dart:io';
+import '../../core/constants/app_constants.dart';
 import '../../data/models/workplace_model.dart';
 import '../controllers/workplace_detail_controller.dart';
 
@@ -45,12 +47,26 @@ class AddEmployeeController extends GetxController {
             .toList();
       }
     } else {
-      // 이전 방식과의 호환성
       workplace = arguments as Workplace;
     }
 
-    // 기본 최저시급 설정 (2025년 기준 10,030원)
-    wageController.text = '10030';
+    // 현재 날짜 기준 최저시급 설정
+    wageController.text = AppConstants.getCurrentMinimumWage().toString();
+  }
+
+  String? validateWage(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return '시급을 입력해주세요';
+    }
+
+    final wage = int.tryParse(value.trim());
+    final currentMinWage = AppConstants.getCurrentMinimumWage();
+
+    if (wage == null || wage < currentMinWage) {
+      return '최저시급(${NumberFormat.currency(locale: 'ko_KR', symbol: '').format(currentMinWage)}원) 이상을 입력해주세요';
+    }
+
+    return null;
   }
 
   @override
@@ -223,19 +239,6 @@ class AddEmployeeController extends GetxController {
     String numbers = value.replaceAll(RegExp(r'[^0-9]'), '');
     if (numbers.length != 11 || !numbers.startsWith('010')) {
       return '올바른 전화번호를 입력해주세요 (010-XXXX-XXXX)';
-    }
-
-    return null;
-  }
-
-  String? validateWage(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return '시급을 입력해주세요';
-    }
-
-    final wage = int.tryParse(value.trim());
-    if (wage == null || wage < 10030) { // 2025년 최저시급
-      return '최저시급(10,030원) 이상을 입력해주세요';
     }
 
     return null;

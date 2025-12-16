@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../controllers/add_employee_controller.dart';
 
 class AddEmployeeView extends GetView<AddEmployeeController> {
@@ -195,6 +196,9 @@ class AddEmployeeView extends GetView<AddEmployeeController> {
 
   Widget _buildWageField() {
     final currencyFormatter = NumberFormat.currency(locale: 'ko_KR', symbol: '');
+    final now = DateTime.now();
+    final currentYear = now.year;
+    final currentMinWage = AppConstants.getCurrentMinimumWage();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -215,10 +219,10 @@ class AddEmployeeView extends GetView<AddEmployeeController> {
             FilteringTextInputFormatter.digitsOnly,
           ],
           decoration: InputDecoration(
-            hintText: '10030',
+            hintText: currentMinWage.toString(),
             prefixIcon: const Icon(Icons.monetization_on),
             suffixText: '원',
-            helperText: '2025년 최저시급: ${currencyFormatter.format(10030)}원',
+            helperText: '$currentYear년 최저시급: ${currencyFormatter.format(currentMinWage)}원',
           ),
           onChanged: (value) {
             controller.formKey.currentState?.validate();

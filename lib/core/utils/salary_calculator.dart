@@ -1,8 +1,12 @@
 import '../../data/models/schedule_model.dart';
 import '../constants/app_constants.dart';
 
+import '../../data/models/schedule_model.dart';
+import '../constants/app_constants.dart';
+
 class SalaryCalculator {
   /// 월 급여 계산 (일용직: 기본급 + 주휴수당 - 세금)
+  /// 2025년/2026년 최저시급을 근무일 기준으로 자동 적용
   static Map<String, dynamic> calculateMonthlySalary({
     required List<Schedule> schedules,
     required double hourlyWage,
@@ -56,8 +60,8 @@ class SalaryCalculator {
       'totalHours': totalHours,
       'regularHours': regularHours,
       'substituteHours': substituteHours,
-      'regularDays': regularDays,        // 추가
-      'substituteDays': substituteDays,  // 추가
+      'regularDays': regularDays,
+      'substituteDays': substituteDays,
       'weeklyHolidayHours': weeklyHolidayHours,
       'basicPay': basicPay,
       'weeklyHolidayPay': weeklyHolidayPay,
@@ -84,7 +88,6 @@ class SalaryCalculator {
 
       // 주 15시간 이상 근무 시 주휴수당 지급
       if (weekTotalHours >= AppConstants.weeklyHolidayMinHours && workDays > 0) {
-        // 주휴수당은 일평균 근로시간 (최대 8시간)
         double dailyAverage = weekTotalHours / workDays;
         double holidayHours = dailyAverage > 8 ? 8 : dailyAverage;
         totalWeeklyHolidayHours += holidayHours;
@@ -120,7 +123,7 @@ class SalaryCalculator {
     );
 
     if (date.isBefore(firstMonday)) {
-      return 0; // 첫 주
+      return 0;
     }
 
     return ((date.difference(firstMonday).inDays) / 7).floor() + 1;
