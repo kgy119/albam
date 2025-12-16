@@ -19,23 +19,34 @@ class LoginView extends GetView<AuthController> {
               children: [
                 // 앱 로고
                 Container(
-                  width: 100,
-                  height: 100,
+                  width: 120,
+                  height: 120,
                   decoration: BoxDecoration(
                     color: Theme.of(context).primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(50),
+                    borderRadius: BorderRadius.circular(60),
                   ),
-                  child: Icon(
-                    Icons.work_rounded,
-                    size: 50,
-                    color: Theme.of(context).primaryColor,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(60),
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      width: 120,
+                      height: 120,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Icon(
+                          Icons.work_rounded,
+                          size: 60,
+                          color: Theme.of(context).primaryColor,
+                        );
+                      },
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
 
                 // 앱 이름
                 Text(
-                  'Albam',
+                  '알바관리',
                   style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                     color: Theme.of(context).primaryColor,
                     fontWeight: FontWeight.bold,
@@ -48,7 +59,7 @@ class LoginView extends GetView<AuthController> {
                     color: Colors.grey[600],
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 20),
 
                 // 모드 안내 텍스트
                 Obx(() {
@@ -317,7 +328,7 @@ class LoginView extends GetView<AuthController> {
                     ),
                   );
                 }),
-                const SizedBox(height: 24),
+                const SizedBox(height: 18),
 
                 // 구분선 (비밀번호 찾기 모드가 아닐 때만)
                 Obx(() {

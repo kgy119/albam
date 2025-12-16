@@ -1,5 +1,5 @@
 name: albam
-description: 알밤 - 알바 매니저
+description: 알바관리 - 아르바이트 관리 서비스
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -35,6 +35,32 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.0
+
+# 런처 아이콘 설정
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#7C4DFF"
+  adaptive_icon_foreground: "assets/images/logo.png"
+  remove_alpha_ios: true
+
+# 스플래시 화면 설정
+flutter_native_splash:
+  color: "#7C4DFF"
+  image: assets/images/logo.png
+  android_12:
+    image: assets/images/logo.png
+    color: "#7C4DFF"
+  ios: true
+  android: true
+  web: false
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/images/logo.png

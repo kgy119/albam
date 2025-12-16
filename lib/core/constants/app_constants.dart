@@ -3,7 +3,7 @@ import '../services/minimum_wage_service.dart';
 
 class AppConstants {
   // 앱 정보
-  static const String appName = 'Albam';
+  static const String appName = '알바관리';
   static const String appVersion = '1.0.0';
 
   // Firebase 컬렉션명
