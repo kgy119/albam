@@ -30,7 +30,7 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: date_utils.DateUtils.getWeekdayColorForDarkBg(weekday),
+                color: date_utils.DateUtils.getWeekdayColorForLightBg(weekday),
               ),
             ),
           ],
@@ -81,6 +81,17 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
         )
             : const Icon(Icons.add),
       )),
+    );
+  }
+
+  Widget _buildScheduleList() {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+      itemCount: controller.schedules.length,
+      itemBuilder: (context, index) {
+        final schedule = controller.schedules[index];
+        return _buildScheduleCard(schedule);
+      },
     );
   }
 
@@ -170,27 +181,6 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildScheduleList() {
-    return Column(
-      children: [
-        // 24시간 타임라인 헤더
-        _buildTimelineHeader(),
-
-        // 스케줄 목록
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), // 하단에 플로팅버튼 여백 추가
-            itemCount: controller.schedules.length,
-            itemBuilder: (context, index) {
-              final schedule = controller.schedules[index];
-              return _buildScheduleCard(schedule);
-            },
-          ),
-        ),
-      ],
     );
   }
 

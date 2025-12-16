@@ -13,37 +13,110 @@ class AddEmployeeView extends GetView<AddEmployeeController> {
       appBar: AppBar(
         title: Text('${controller.workplace.name} 직원 추가'),
       ),
-      body: Form(
-        key: controller.formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 이름 입력
-              _buildNameField(),
-              const SizedBox(height: 16),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 스크롤 가능한 폼 영역
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                child: Form(
+                  key: controller.formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 이름 입력
+                      _buildNameField(),
+                      const SizedBox(height: 16),
 
-              // 전화번호 입력
-              _buildPhoneField(),
-              const SizedBox(height: 16),
+                      // 전화번호 입력
+                      _buildPhoneField(),
+                      const SizedBox(height: 16),
 
-              // 시급 입력
-              _buildWageField(),
-              const SizedBox(height: 24),
+                      // 시급 입력
+                      _buildWageField(),
+                      const SizedBox(height: 24),
 
-              // 계좌정보 입력 추가
-              _buildBankInfoFields(),
-              const SizedBox(height: 24),
+                      // 계좌정보 입력
+                      _buildBankInfoFields(),
+                      const SizedBox(height: 24),
 
-              // 근로계약서 섹션
-              _buildContractSection(),
-              const SizedBox(height: 32),
+                      // 근로계약서 섹션
+                      _buildContractSection(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
-              // 추가 버튼
-              _buildAddButton(),
-            ],
-          ),
+            // 하단 고정 추가 버튼
+            Container(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                12,
+                16,
+                12 + MediaQuery.of(context).padding.bottom,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -5),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: Obx(() => ElevatedButton(
+                    onPressed: controller.isLoading.value || controller.isImageUploading.value
+                        ? null
+                        : controller.addEmployee,
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: controller.isLoading.value || controller.isImageUploading.value
+                        ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          controller.isImageUploading.value
+                              ? '근로계약서 업로드 중...'
+                              : '직원 등록 중...',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    )
+                        : const Text(
+                      '직원 추가',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  )),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -148,9 +221,48 @@ class AddEmployeeView extends GetView<AddEmployeeController> {
             helperText: '2025년 최저시급: ${currencyFormatter.format(10030)}원',
           ),
           onChanged: (value) {
-            // 실시간 유효성 검사
             controller.formKey.currentState?.validate();
           },
+          textInputAction: TextInputAction.done,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBankInfoFields() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '계좌정보 (선택사항)',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // 은행명
+        TextFormField(
+          controller: controller.bankNameController,
+          decoration: const InputDecoration(
+            hintText: '예) 국민은행',
+            prefixIcon: Icon(Icons.account_balance),
+            labelText: '은행명',
+          ),
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 16),
+
+        // 계좌번호
+        TextFormField(
+          controller: controller.accountNumberController,
+          decoration: const InputDecoration(
+            hintText: '123456-78-901234',
+            prefixIcon: Icon(Icons.credit_card),
+            labelText: '계좌번호',
+          ),
+          keyboardType: TextInputType.number,
           textInputAction: TextInputAction.done,
         ),
       ],
@@ -310,45 +422,4 @@ class AddEmployeeView extends GetView<AddEmployeeController> {
       )),
     );
   }
-
-  Widget _buildBankInfoFields() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          '계좌정보 (선택사항)',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        // 은행명
-        TextFormField(
-          controller: controller.bankNameController,
-          decoration: const InputDecoration(
-            hintText: '예) 국민은행',
-            prefixIcon: Icon(Icons.account_balance),
-            labelText: '은행명',
-          ),
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: 16),
-
-        // 계좌번호
-        TextFormField(
-          controller: controller.accountNumberController,
-          decoration: const InputDecoration(
-            hintText: '123456-78-901234',
-            prefixIcon: Icon(Icons.credit_card),
-            labelText: '계좌번호',
-          ),
-          keyboardType: TextInputType.number,
-          textInputAction: TextInputAction.done,
-        ),
-      ],
-    );
-  }
-
 }

@@ -209,326 +209,381 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('직원 정보 수정'),
-        actions: [
-          TextButton(
-            onPressed: _isLoading || _isImageUploading ? null : _updateEmployee,
-            child: _isLoading || _isImageUploading
-                ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-                : const Text(
-              '저장',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
       ),
       body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              16,
-              16,
-              16 + MediaQuery.of(context).padding.bottom,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 기본 정보 카드
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          '기본 정보',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // 이름
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: '이름',
-                            prefixIcon: Icon(Icons.person),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return '이름을 입력해주세요';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // 전화번호
-                        TextFormField(
-                          controller: _phoneController,
-                          decoration: const InputDecoration(
-                            labelText: '전화번호',
-                            prefixIcon: Icon(Icons.phone),
-                            hintText: '010-0000-0000',
-                          ),
-                          keyboardType: TextInputType.phone,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(11),
-                          ],
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return '전화번호를 입력해주세요';
-                            }
-                            String numbers = value.replaceAll(RegExp(r'[^0-9]'), '');
-                            if (numbers.length != 11 || !numbers.startsWith('010')) {
-                              return '올바른 전화번호를 입력해주세요';
-                            }
-                            return null;
-                          },
-                          onChanged: (value) {
-                            if (value.length == 11) {
-                              _phoneController.text = controller.formatPhoneNumber(value);
-                              _phoneController.selection = TextSelection.fromPosition(
-                                TextPosition(offset: _phoneController.text.length),
-                              );
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        // 시급
-                        TextFormField(
-                          controller: _wageController,
-                          decoration: InputDecoration(
-                            labelText: '시급',
-                            prefixIcon: const Icon(Icons.monetization_on),
-                            suffixText: '원',
-                            helperText: '2025년 최저시급: ${currencyFormatter.format(AppConstants.minimumWage)}원',
-                          ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return '시급을 입력해주세요';
-                            }
-                            final wage = int.tryParse(value);
-                            if (wage == null || wage < AppConstants.minimumWage) {
-                              return '최저시급(${currencyFormatter.format(AppConstants.minimumWage)}원) 이상을 입력해주세요';
-                            }
-                            return null;
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
+        child: Column(
+          children: [
+            // 스크롤 가능한 폼 영역
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  16,
                 ),
-                const SizedBox(height: 16),
-
-                // 계좌정보 카드
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          '계좌정보',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // 은행명
-                        TextFormField(
-                          controller: _bankNameController,
-                          decoration: const InputDecoration(
-                            labelText: '은행명',
-                            prefixIcon: Icon(Icons.account_balance),
-                            hintText: '예) 국민은행',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // 계좌번호
-                        TextFormField(
-                          controller: _accountNumberController,
-                          decoration: const InputDecoration(
-                            labelText: '계좌번호',
-                            prefixIcon: Icon(Icons.credit_card),
-                            hintText: '123456-78-901234',
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // 근로계약서 카드
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          '근로계약서',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        if (_newContractImage != null) ...[
-                          // 새로 선택한 이미지
-                          Container(
-                            height: 200,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey[300]!),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.file(
-                                    _newContractImage!,
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                  ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 기본 정보 카드
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '기본 정보',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  child: IconButton(
-                                    icon: const Icon(Icons.close, color: Colors.white),
-                                    style: IconButton.styleFrom(
-                                      backgroundColor: Colors.red,
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _newContractImage = null;
-                                      });
-                                    },
-                                  ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // 이름
+                              TextFormField(
+                                controller: _nameController,
+                                decoration: const InputDecoration(
+                                  labelText: '이름',
+                                  prefixIcon: Icon(Icons.person),
                                 ),
-                              ],
-                            ),
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return '이름을 입력해주세요';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+
+                              // 전화번호
+                              TextFormField(
+                                controller: _phoneController,
+                                decoration: const InputDecoration(
+                                  labelText: '전화번호',
+                                  prefixIcon: Icon(Icons.phone),
+                                  hintText: '010-0000-0000',
+                                ),
+                                keyboardType: TextInputType.phone,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(11),
+                                ],
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return '전화번호를 입력해주세요';
+                                  }
+                                  String numbers = value.replaceAll(RegExp(r'[^0-9]'), '');
+                                  if (numbers.length != 11 || !numbers.startsWith('010')) {
+                                    return '올바른 전화번호를 입력해주세요';
+                                  }
+                                  return null;
+                                },
+                                onChanged: (value) {
+                                  if (value.length == 11) {
+                                    _phoneController.text = controller.formatPhoneNumber(value);
+                                    _phoneController.selection = TextSelection.fromPosition(
+                                      TextPosition(offset: _phoneController.text.length),
+                                    );
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 16),
+
+                              // 시급
+                              TextFormField(
+                                controller: _wageController,
+                                decoration: InputDecoration(
+                                  labelText: '시급',
+                                  prefixIcon: const Icon(Icons.monetization_on),
+                                  suffixText: '원',
+                                  helperText: '2025년 최저시급: ${currencyFormatter.format(AppConstants.minimumWage)}원',
+                                ),
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return '시급을 입력해주세요';
+                                  }
+                                  final wage = int.tryParse(value);
+                                  if (wage == null || wage < AppConstants.minimumWage) {
+                                    return '최저시급(${currencyFormatter.format(AppConstants.minimumWage)}원) 이상을 입력해주세요';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ],
                           ),
-                        ] else if (employee.contractImageUrl != null && !_isImageDeleted) ...[
-                          // 기존 이미지 (삭제 표시되지 않은 경우만)
-                          Container(
-                            height: 200,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey[300]!),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    employee.contractImageUrl!,
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return const Center(
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(Icons.error_outline, size: 48),
-                                            SizedBox(height: 8),
-                                            Text('이미지를 불러올 수 없습니다'),
-                                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 계좌정보 카드
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '계좌정보',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // 은행명
+                              TextFormField(
+                                controller: _bankNameController,
+                                decoration: const InputDecoration(
+                                  labelText: '은행명',
+                                  prefixIcon: Icon(Icons.account_balance),
+                                  hintText: '예) 국민은행',
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // 계좌번호
+                              TextFormField(
+                                controller: _accountNumberController,
+                                decoration: const InputDecoration(
+                                  labelText: '계좌번호',
+                                  prefixIcon: Icon(Icons.credit_card),
+                                  hintText: '123456-78-901234',
+                                ),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 근로계약서 카드
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '근로계약서',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              if (_newContractImage != null) ...[
+                                // 새로 선택한 이미지
+                                Container(
+                                  height: 200,
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey[300]!),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.file(
+                                          _newContractImage!,
+                                          fit: BoxFit.cover,
+                                          width: double.infinity,
                                         ),
-                                      );
-                                    },
+                                      ),
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: IconButton(
+                                          icon: const Icon(Icons.close, color: Colors.white),
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: Colors.red,
+                                          ),
+                                          onPressed: () {
+                                            setState(() {
+                                              _newContractImage = null;
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  child: IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.white),
-                                    style: IconButton.styleFrom(
-                                      backgroundColor: Colors.red,
-                                    ),
-                                    onPressed: _showDeleteImageDialog,
+                              ] else if (employee.contractImageUrl != null && !_isImageDeleted) ...[
+                                // 기존 이미지
+                                Container(
+                                  height: 200,
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey[300]!),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(
+                                          employee.contractImageUrl!,
+                                          fit: BoxFit.cover,
+                                          width: double.infinity,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return const Center(
+                                              child: Column(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(Icons.error_outline, size: 48),
+                                                  SizedBox(height: 8),
+                                                  Text('이미지를 불러올 수 없습니다'),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: IconButton(
+                                          icon: const Icon(Icons.delete, color: Colors.white),
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: Colors.red,
+                                          ),
+                                          onPressed: _showDeleteImageDialog,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ] else ...[
+                                // 이미지 없음
+                                Container(
+                                  height: 150,
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey[300]!),
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: Colors.grey[50],
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.image_not_supported, size: 48),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        _isImageDeleted
+                                            ? '근로계약서가 삭제 예정입니다\n(저장 시 완전 삭제)'
+                                            : '근로계약서가 등록되지 않았습니다',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: _isImageDeleted ? Colors.orange[700] : null,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
-                            ),
-                          ),
-                        ] else ...[
-                          // 이미지 없음 (삭제된 경우도 여기 표시)
-                          Container(
-                            height: 150,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey[300]!),
-                              borderRadius: BorderRadius.circular(8),
-                              color: Colors.grey[50],
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.image_not_supported, size: 48),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _isImageDeleted
-                                      ? '근로계약서가 삭제 예정입니다\n(저장 시 완전 삭제)'
-                                      : '근로계약서가 등록되지 않았습니다',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: _isImageDeleted ? Colors.orange[700] : null,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
 
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: _isImageUploading ? null : _pickImage,
-                            icon: _isImageUploading
-                                ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                                : const Icon(Icons.photo_library),
-                            label: Text(_newContractImage != null ? '다른 이미지 선택' : '이미지 선택'),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: _isImageUploading ? null : _pickImage,
+                                  icon: _isImageUploading
+                                      ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                      : const Icon(Icons.photo_library),
+                                  label: Text(_newContractImage != null ? '다른 이미지 선택' : '이미지 선택'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // 하단 고정 저장 버튼
+            Container(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                12,
+                16,
+                12 + MediaQuery.of(context).padding.bottom,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -5),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _isLoading || _isImageUploading ? null : _updateEmployee,
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isLoading || _isImageUploading
+                        ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          _isImageUploading
+                              ? '이미지 업로드 중...'
+                              : '저장 중...',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
+                    )
+                        : const Text(
+                      '저장',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

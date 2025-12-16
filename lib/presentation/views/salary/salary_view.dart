@@ -268,8 +268,9 @@ class SalaryView extends GetView<SalaryController> {
     );
   }
 
+  /// 요일 헤더
   Widget _buildWeekHeader() {
-    const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 
     return Row(
       children: weekdays.map((day) => Expanded(
@@ -303,7 +304,8 @@ class SalaryView extends GetView<SalaryController> {
       ),
       itemCount: 42, // 6주
       itemBuilder: (context, index) {
-        final day = index - firstDayOfWeek + 2;
+        // 일요일 시작 (0: 일요일, 1: 월요일, ..., 6: 토요일)
+        final day = index - firstDayOfWeek + 1;
 
         if (day <= 0 || day > daysInMonth) {
           return Container();
@@ -313,6 +315,7 @@ class SalaryView extends GetView<SalaryController> {
       },
     );
   }
+
 
   Widget _buildCalendarDay(int day, int year, int month) {
     return Obx(() {
@@ -444,31 +447,78 @@ class SalaryView extends GetView<SalaryController> {
             ],
           ),
           const SizedBox(height: 8),
-          ...schedules.map((schedule) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                Icon(Icons.access_time, size: 16, color: Colors.blue[700]),
-                const SizedBox(width: 8),
-                Text(
-                  schedule.timeRangeString,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.blue[900],
-                    fontWeight: FontWeight.w500,
+
+          // 시간순으로 정렬된 스케줄 표시
+          ...schedules.asMap().entries.map((entry) {
+            final index = entry.key;
+            final schedule = entry.value;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  // 순번 표시
+                  Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: Colors.blue[700],
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${index + 1}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '(${schedule.workTimeString})',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.blue[700],
+                  const SizedBox(width: 8),
+                  Icon(Icons.access_time, size: 16, color: Colors.blue[700]),
+                  const SizedBox(width: 8),
+                  Text(
+                    schedule.timeRangeString,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue[900],
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          )),
+                  const SizedBox(width: 8),
+                  Text(
+                    '(${schedule.workTimeString})',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.blue[700],
+                    ),
+                  ),
+
+                  // 대체근무 표시
+                  if (schedule.isSubstitute) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.orange,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        '대체',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );

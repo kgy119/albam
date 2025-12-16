@@ -379,7 +379,7 @@ class WorkplaceDetailController extends GetxController {
   List<Schedule> getDaySchedules(int day) {
     final targetDate = DateTime(selectedDate.value.year, selectedDate.value.month, day);
 
-    return monthlySchedules.where((schedule) {
+    final daySchedules = monthlySchedules.where((schedule) {
       final scheduleDate = DateTime(
           schedule.date.year,
           schedule.date.month,
@@ -387,6 +387,11 @@ class WorkplaceDetailController extends GetxController {
       );
       return scheduleDate.isAtSameMomentAs(targetDate);
     }).toList();
+
+    // 시작 시간 기준 오름차순 정렬
+    daySchedules.sort((a, b) => a.startTime.compareTo(b.startTime));
+
+    return daySchedules;
   }
 
   /// 월 변경
@@ -411,7 +416,7 @@ class WorkplaceDetailController extends GetxController {
   /// 해당 월의 첫째 날이 무슨 요일인지 계산
   int getFirstDayOfWeek() {
     final firstDay = DateTime(selectedDate.value.year, selectedDate.value.month, 1);
-    return firstDay.weekday;
+    return firstDay.weekday % 7;
   }
 
   /// 최신 직원 정보 가져오기

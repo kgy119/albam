@@ -110,7 +110,7 @@ class SalaryController extends GetxController {
   List<Schedule> getDaySchedules(int day, int year, int month) {
     final targetDate = DateTime(year, month, day);
 
-    return monthlySchedules.where((schedule) {
+    final daySchedules = monthlySchedules.where((schedule) {
       final scheduleDate = DateTime(
         schedule.date.year,
         schedule.date.month,
@@ -118,6 +118,11 @@ class SalaryController extends GetxController {
       );
       return scheduleDate.isAtSameMomentAs(targetDate);
     }).toList();
+
+    // 시작 시간 기준 오름차순 정렬
+    daySchedules.sort((a, b) => a.startTime.compareTo(b.startTime));
+
+    return daySchedules;
   }
 
   int getDaysInMonth(int year, int month) {
@@ -126,7 +131,7 @@ class SalaryController extends GetxController {
 
   int getFirstDayOfWeek(int year, int month) {
     final firstDay = DateTime(year, month, 1);
-    return firstDay.weekday;
+    return firstDay.weekday % 7;
   }
 
   void selectDay(int day) {

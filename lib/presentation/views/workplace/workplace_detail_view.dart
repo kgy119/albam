@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../../app/theme/app_theme.dart';
 import '../../controllers/workplace_detail_controller.dart';
 import '../../../app/routes/app_routes.dart';
 
@@ -20,7 +21,6 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
             },
             tooltip: '직원 관리',
           ),
-          // 전체 급여 요약 버튼 추가
           IconButton(
             icon: const Icon(Icons.receipt_long),
             onPressed: () {
@@ -37,18 +37,27 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
           ),
         ],
       ),
-      body: SafeArea(  // SafeArea 추가
+      body: SafeArea(
         child: Column(
           children: [
-            // 월/년 선택 헤더
+            // 월/년 선택 헤더 (고정)
             _buildMonthHeader(),
 
-            // 월별 통계 카드
-            _buildMonthlyStatsCard(),
-
-            // 달력
+            // 달력 + 월별 통계 (스크롤 가능)
             Expanded(
-              child: _buildCalendar(),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    // 달력
+                    _buildCalendarSection(),
+
+                    // 월별 통계 카드
+                    _buildMonthlyStatsCard(),
+
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -56,37 +65,284 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
     );
   }
 
-  // _buildMonthlyStatsCard 메서드 수정
+  Widget _buildMonthHeader() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            onPressed: () {
+              final current = controller.selectedDate.value;
+              final prevMonth = DateTime(current.year, current.month - 1, 1);
+              controller.changeMonth(prevMonth.year, prevMonth.month);
+            },
+            icon: const Icon(Icons.chevron_left),
+            style: IconButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+            ),
+          ),
+
+          Obx(() {
+            final date = controller.selectedDate.value;
+            return GestureDetector(
+              onTap: _showMonthYearPicker,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${date.year}년 ${date.month}월',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.calendar_month,
+                      size: 20,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+
+          IconButton(
+            onPressed: () {
+              final current = controller.selectedDate.value;
+              final nextMonth = DateTime(current.year, current.month + 1, 1);
+              controller.changeMonth(nextMonth.year, nextMonth.month);
+            },
+            icon: const Icon(Icons.chevron_right),
+            style: IconButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 요일 헤더
+  Widget _buildWeekHeader() {
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+
+    return Row(
+      children: weekdays.map((day) => Expanded(
+        child: Center(
+          child: Text(
+            day,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              color: day == '일' ? Colors.red :
+              day == '토' ? Colors.blue : Colors.grey[700],
+            ),
+          ),
+        ),
+      )).toList(),
+    );
+  }
+
+  /// 달력 섹션
+  Widget _buildCalendarSection() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          // 요일 헤더
+          _buildWeekHeader(),
+          const SizedBox(height: 8),
+
+          // 달력 그리드
+          Obx(() {
+            final daysInMonth = controller.getDaysInMonth();
+            final firstDayOfWeek = controller.getFirstDayOfWeek();
+
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                childAspectRatio: 1.0,
+                crossAxisSpacing: 4,
+                mainAxisSpacing: 4,
+              ),
+              itemCount: 42, // 6주 * 7일
+              itemBuilder: (context, index) {
+                // 일요일 시작 (0: 일요일, 1: 월요일, ..., 6: 토요일)
+                final day = index - firstDayOfWeek + 1;
+
+                if (day <= 0 || day > daysInMonth) {
+                  return Container();
+                }
+
+                return _buildCalendarDay(day);
+              },
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarDay(int day) {
+    final isToday = DateTime.now().day == day &&
+        DateTime.now().month == controller.selectedDate.value.month &&
+        DateTime.now().year == controller.selectedDate.value.year;
+
+    return Obx(() {
+      final isSelected = controller.selectedDay.value == day;
+      final dayTotalHours = controller.getDayTotalHours(day);
+      final hasSchedule = dayTotalHours > 0;
+
+      return GestureDetector(
+        onTap: () async {
+          await Get.toNamed(
+            AppRoutes.scheduleSetting,
+            arguments: {
+              'workplace': controller.workplace,
+              'date': DateTime(
+                controller.selectedDate.value.year,
+                controller.selectedDate.value.month,
+                day,
+              ),
+            },
+          );
+          controller.loadMonthlySchedules();
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppTheme.primaryColor
+                : isToday
+                ? AppTheme.primaryColor.withOpacity(0.15)
+                : hasSchedule
+                ? AppTheme.successColor.withOpacity(0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: hasSchedule
+                  ? AppTheme.successColor
+                  : isToday
+                  ? AppTheme.primaryColor
+                  : Colors.grey[300]!,
+              width: hasSchedule || isToday ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '$day',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: isSelected
+                      ? Colors.white
+                      : isToday
+                      ? AppTheme.primaryColor
+                      : hasSchedule
+                      ? AppTheme.successColor
+                      : Colors.black87,
+                ),
+              ),
+
+              const SizedBox(height: 2),
+              if (hasSchedule)
+                Text(
+                  '${dayTotalHours.toStringAsFixed(1)}h',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: isSelected
+                        ? Colors.white.withOpacity(0.9)
+                        : AppTheme.successColor,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
   Widget _buildMonthlyStatsCard() {
     return Obx(() {
       if (controller.isLoadingStats.value) {
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(40),
           child: const Center(child: CircularProgressIndicator()),
         );
       }
 
       final stats = controller.monthlyStats.value;
-      if (stats.isEmpty) return const SizedBox.shrink();
+      if (stats.isEmpty) {
+        return Container(
+          margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                Icons.bar_chart_outlined,
+                size: 48,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '이번 달 근무 기록이 없습니다',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
 
       final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '');
 
       return Container(
-        margin: const EdgeInsets.all(16),
+        margin: const EdgeInsets.symmetric(horizontal: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Theme.of(Get.context!).primaryColor,
-              Theme.of(Get.context!).primaryColor.withOpacity(0.8),
+              AppTheme.primaryColor,
+              AppTheme.primaryColor.withOpacity(0.8),
             ],
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Theme.of(Get.context!).primaryColor.withOpacity(0.3),
+              color: AppTheme.primaryColor.withOpacity(0.3),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -98,12 +354,35 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  '이번 달 요약',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                // 년월 표시 (폰트 색상 다르게)
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '${controller.selectedDate.value.year}년 ',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      TextSpan(
+                        text: '${controller.selectedDate.value.month}월 ',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      TextSpan(
+                        text: '요약',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 Container(
@@ -131,7 +410,7 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
             ),
             const SizedBox(height: 20),
 
-            // 총 실수령액 (크게)
+            // 총 실수령액
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -225,12 +504,14 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
             children: [
               Icon(icon, size: 14, color: Colors.white70),
               const SizedBox(width: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w500,
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
@@ -250,217 +531,6 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon) {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 16, color: Colors.white70),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.white70,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMonthHeader() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      color: Theme.of(Get.context!).primaryColor.withOpacity(0.1),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          IconButton(
-            onPressed: () {
-              final current = controller.selectedDate.value;
-              final prevMonth = DateTime(current.year, current.month - 1, 1);
-              controller.changeMonth(prevMonth.year, prevMonth.month);
-            },
-            icon: const Icon(Icons.chevron_left),
-          ),
-
-          Obx(() {
-            final date = controller.selectedDate.value;
-            return GestureDetector(
-              onTap: _showMonthYearPicker,
-              child: Text(
-                '${date.year}년 ${date.month}월',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            );
-          }),
-
-          IconButton(
-            onPressed: () {
-              final current = controller.selectedDate.value;
-              final nextMonth = DateTime(current.year, current.month + 1, 1);
-              controller.changeMonth(nextMonth.year, nextMonth.month);
-            },
-            icon: const Icon(Icons.chevron_right),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCalendar() {
-    return Obx(() {
-      final daysInMonth = controller.getDaysInMonth();
-      final firstDayOfWeek = controller.getFirstDayOfWeek();
-
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // 요일 헤더
-            _buildWeekHeader(),
-
-            const SizedBox(height: 8),
-
-            // 달력 그리드
-            Expanded(
-              child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 7,
-                  childAspectRatio: 1.0,
-                  crossAxisSpacing: 4,
-                  mainAxisSpacing: 4,
-                ),
-                itemCount: 42, // 6주 * 7일
-                itemBuilder: (context, index) {
-                  final day = index - firstDayOfWeek + 2; // 월요일부터 시작하도록 조정
-
-                  if (day <= 0 || day > daysInMonth) {
-                    return Container(); // 빈 셀
-                  }
-
-                  return _buildCalendarDay(day);
-                },
-              ),
-            ),
-          ],
-        ),
-      );
-    });
-  }
-
-  Widget _buildWeekHeader() {
-    const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
-
-    return Row(
-      children: weekdays.map((day) => Expanded(
-        child: Center(
-          child: Text(
-            day,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: day == '일' ? Colors.red :
-              day == '토' ? Colors.blue : Colors.grey[600],
-            ),
-          ),
-        ),
-      )).toList(),
-    );
-  }
-
-  Widget _buildCalendarDay(int day) {
-    final isToday = DateTime.now().day == day &&
-        DateTime.now().month == controller.selectedDate.value.month &&
-        DateTime.now().year == controller.selectedDate.value.year;
-
-    return Obx(() {
-      final isSelected = controller.selectedDay.value == day;
-      final dayTotalHours = controller.getDayTotalHours(day);
-      final hasSchedule = dayTotalHours > 0;
-
-      return GestureDetector(
-        onTap: () async {
-          // 스케줄 설정 화면으로 이동하고 결과를 기다림
-          await Get.toNamed(
-            AppRoutes.scheduleSetting,
-            arguments: {
-              'workplace': controller.workplace,
-              'date': DateTime(
-                controller.selectedDate.value.year,
-                controller.selectedDate.value.month,
-                day,
-              ),
-            },
-          );
-
-          // 돌아왔을 때 스케줄 데이터 새로고침
-          controller.loadMonthlySchedules();
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: isSelected
-                ? Theme.of(Get.context!).primaryColor
-                : isToday
-                ? Theme.of(Get.context!).primaryColor.withOpacity(0.3)
-                : hasSchedule
-                ? Colors.green.withOpacity(0.1)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: hasSchedule ? Colors.green : Colors.grey[300]!,
-              width: hasSchedule ? 2 : 1,
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                '$day',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: isSelected || isToday
-                      ? Colors.white
-                      : hasSchedule
-                      ? Colors.green[700]
-                      : Colors.black87,
-                ),
-              ),
-
-              // 해당 날짜의 총 근무시간 표시
-              const SizedBox(height: 2),
-              if (hasSchedule)
-                Text(
-                  '${dayTotalHours.toStringAsFixed(1)}h',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w500,
-                    color: isSelected || isToday
-                        ? Colors.white70
-                        : Colors.green[600],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      );
-    });
-  }
-
   void _showMonthYearPicker() {
     showDialog(
       context: Get.context!,
@@ -475,7 +545,7 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
                 // 년도 선택
                 Expanded(
                   child: ListView.builder(
-                    itemCount: 10, // 현재 년도 기준 ±5년
+                    itemCount: 10,
                     itemBuilder: (context, index) {
                       final year = DateTime.now().year - 5 + index;
                       return ListTile(
