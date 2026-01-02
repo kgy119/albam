@@ -11,25 +11,14 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # UI 관련
   cupertino_icons: ^1.0.8
-
-  # 상태 관리
   get: ^4.6.6
-
-  # Firebase 관련
-  firebase_core: ^3.6.0
-  firebase_auth: ^5.3.1
-  cloud_firestore: ^5.4.3
-  firebase_storage: ^12.4.10
-
-  # 소셜 로그인
-  google_sign_in: ^6.2.1
-
-  # 기타 유틸
   intl: ^0.18.1
   image_picker: ^1.2.0
   url_launcher: ^6.3.2
+
+  # Supabase 추가
+  supabase_flutter: ^2.5.0
 
 dev_dependencies:
   flutter_test:

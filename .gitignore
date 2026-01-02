@@ -44,12 +44,6 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Firebase 설정 파일들 (보안상 중요)
-ios/Runner/GoogleService-Info.plist
-android/app/google-services.json
-lib/firebase_options.dart
-ios/firebase_app_id_file.json
-
 # 환경 변수 파일들
 .env
 .env.local

@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class Employee {
   final String id;
   final String workplaceId;
@@ -25,33 +23,95 @@ class Employee {
     required this.updatedAt,
   });
 
-  factory Employee.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  // Supabase에서 데이터 가져올 때 사용
+  factory Employee.fromJson(Map<String, dynamic> json) {
     return Employee(
-      id: doc.id,
-      workplaceId: data['workplaceId'] ?? '',
-      name: data['name'] ?? '',
-      phoneNumber: data['phoneNumber'] ?? '',
-      contractImageUrl: data['contractImageUrl'],
-      hourlyWage: data['hourlyWage'] ?? 0,
-      bankName: data['bankName'],
-      accountNumber: data['accountNumber'],
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      id: json['id'] as String,
+      workplaceId: json['workplace_id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      phoneNumber: json['phone_number'] as String? ?? '',
+      contractImageUrl: json['contract_image_url'] as String?,
+      hourlyWage: json['hourly_wage'] as int? ?? 0,
+      bankName: json['bank_name'] as String?,
+      accountNumber: json['account_number'] as String?,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
+          : DateTime.now(),
     );
   }
 
-  Map<String, dynamic> toFirestore() {
+  // Supabase에 저장할 때 사용
+  Map<String, dynamic> toJson() {
     return {
-      'workplaceId': workplaceId,
+      'id': id,
+      'workplace_id': workplaceId,
       'name': name,
-      'phoneNumber': phoneNumber,
-      'contractImageUrl': contractImageUrl,
-      'hourlyWage': hourlyWage,
-      'bankName': bankName,
-      'accountNumber': accountNumber,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'updatedAt': Timestamp.fromDate(updatedAt),
+      'phone_number': phoneNumber,
+      'contract_image_url': contractImageUrl,
+      'hourly_wage': hourlyWage,
+      'bank_name': bankName,
+      'account_number': accountNumber,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
     };
+  }
+
+  // Insert용 (id 제외)
+  Map<String, dynamic> toInsertJson() {
+    return {
+      'workplace_id': workplaceId,
+      'name': name,
+      'phone_number': phoneNumber,
+      'contract_image_url': contractImageUrl,
+      'hourly_wage': hourlyWage,
+      'bank_name': bankName,
+      'account_number': accountNumber,
+      // created_at, updated_at은 DB에서 자동 생성
+    };
+  }
+
+  // Update용
+  Map<String, dynamic> toUpdateJson() {
+    return {
+      'name': name,
+      'phone_number': phoneNumber,
+      'contract_image_url': contractImageUrl,
+      'hourly_wage': hourlyWage,
+      'bank_name': bankName,
+      'account_number': accountNumber,
+      // updated_at은 트리거에서 자동 업데이트
+    };
+  }
+
+  // 직원 정보 복사
+  Employee copyWith({
+    String? name,
+    String? phoneNumber,
+    String? contractImageUrl,
+    int? hourlyWage,
+    String? bankName,
+    String? accountNumber,
+    DateTime? updatedAt,
+  }) {
+    return Employee(
+      id: id,
+      workplaceId: workplaceId,
+      name: name ?? this.name,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      contractImageUrl: contractImageUrl ?? this.contractImageUrl,
+      hourlyWage: hourlyWage ?? this.hourlyWage,
+      bankName: bankName ?? this.bankName,
+      accountNumber: accountNumber ?? this.accountNumber,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'Employee(id: $id, name: $name, workplaceId: $workplaceId, hourlyWage: $hourlyWage)';
   }
 }

@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import '../../core/constants/app_constants.dart';
+import '../../core/services/storage_service.dart';
 import '../../data/models/workplace_model.dart';
 import '../controllers/workplace_detail_controller.dart';
 
 class AddEmployeeController extends GetxController {
+  final StorageService _storageService = StorageService();
+
   // 폼 컨트롤러들
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
@@ -102,42 +104,23 @@ class AddEmployeeController extends GetxController {
     selectedImage.value = null;
   }
 
-  /// 이미지 Firebase Storage에 업로드
+  /// 이미지 Supabase Storage에 업로드
   Future<String?> _uploadImage() async {
     if (selectedImage.value == null) return null;
 
     try {
       isImageUploading.value = true;
 
-      // 파일명을 고유하게 생성 (타임스탬프 + 랜덤)
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fileName = 'contracts/${workplace.id}/${timestamp}_contract.jpg';
-      final ref = FirebaseStorage.instance.ref().child(fileName);
+      print('Storage 업로드 시작');
 
-      // 메타데이터 설정
-      final metadata = SettableMetadata(
-        contentType: 'image/jpeg',
-        customMetadata: {
-          'workplaceId': workplace.id,
-          'uploadedAt': DateTime.now().toIso8601String(),
-        },
+      // StorageService를 통해 업로드
+      final imageUrl = await _storageService.uploadContractImage(
+        workplaceId: workplace.id,
+        imageFile: selectedImage.value!,
       );
 
-      // 파일 업로드
-      final uploadTask = ref.putFile(selectedImage.value!, metadata);
-
-      // 업로드 진행률 모니터링 (선택사항)
-      uploadTask.snapshotEvents.listen((taskSnapshot) {
-        final progress = taskSnapshot.bytesTransferred / taskSnapshot.totalBytes;
-        print('업로드 진행률: ${(progress * 100).toInt()}%');
-      });
-
-      // 업로드 완료 대기
-      await uploadTask;
-      final downloadUrl = await ref.getDownloadURL();
-
-      print('이미지 업로드 완료: $downloadUrl');
-      return downloadUrl;
+      print('이미지 업로드 완료: $imageUrl');
+      return imageUrl;
     } catch (e) {
       print('이미지 업로드 오류: $e');
       Get.snackbar('오류', '이미지 업로드에 실패했습니다. 다시 시도해주세요.');
@@ -173,8 +156,12 @@ class AddEmployeeController extends GetxController {
         phoneNumber: phoneController.text.trim(),
         hourlyWage: int.parse(wageController.text.trim()),
         contractImageUrl: contractImageUrl,
-        bankName: bankNameController.text.trim().isEmpty ? null : bankNameController.text.trim(),
-        accountNumber: accountNumberController.text.trim().isEmpty ? null : accountNumberController.text.trim(),
+        bankName: bankNameController.text.trim().isEmpty
+            ? null
+            : bankNameController.text.trim(),
+        accountNumber: accountNumberController.text.trim().isEmpty
+            ? null
+            : accountNumberController.text.trim(),
       );
 
       if (success) {
@@ -185,11 +172,9 @@ class AddEmployeeController extends GetxController {
           'success': true,
           'employeeName': nameController.text.trim(),
         });
-
       } else {
         print('직원 추가 실패');
       }
-
     } catch (e) {
       print('직원 추가 예외 오류: $e');
       Get.snackbar(
@@ -206,11 +191,9 @@ class AddEmployeeController extends GetxController {
 
   /// 전화번호 포맷팅
   String formatPhoneNumber(String phone) {
-    // 숫자만 추출
     String numbers = phone.replaceAll(RegExp(r'[^0-9]'), '');
 
     if (numbers.length == 11) {
-      // 010-1234-5678 형태로 포맷팅
       return '${numbers.substring(0, 3)}-${numbers.substring(3, 7)}-${numbers.substring(7)}';
     }
 

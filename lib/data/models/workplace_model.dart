@@ -1,9 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class Workplace {
   final String id;
   final String name;
-  final String ownerId; // 사업장 소유자 ID
+  final String ownerId;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -15,25 +13,46 @@ class Workplace {
     required this.updatedAt,
   });
 
-  // Firestore에서 데이터 가져올 때 사용
-  factory Workplace.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+  // Supabase에서 데이터 가져올 때 사용
+  factory Workplace.fromJson(Map<String, dynamic> json) {
     return Workplace(
-      id: doc.id,
-      name: data['name'] ?? '',
-      ownerId: data['ownerId'] ?? '',
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      updatedAt: (data['updatedAt'] as Timestamp).toDate(),
+      id: json['id'] as String,
+      name: json['name'] as String? ?? '',
+      ownerId: json['owner_id'] as String? ?? '',
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
+          : DateTime.now(),
     );
   }
 
-  // Firestore에 저장할 때 사용
-  Map<String, dynamic> toFirestore() {
+  // Supabase에 저장할 때 사용
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'owner_id': ownerId,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+
+  // Insert용 (id 제외)
+  Map<String, dynamic> toInsertJson() {
     return {
       'name': name,
-      'ownerId': ownerId,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'updatedAt': Timestamp.fromDate(updatedAt),
+      'owner_id': ownerId,
+      // created_at, updated_at은 DB에서 자동 생성
+    };
+  }
+
+  // Update용
+  Map<String, dynamic> toUpdateJson() {
+    return {
+      'name': name,
+      // updated_at은 트리거에서 자동 업데이트
     };
   }
 
@@ -49,5 +68,10 @@ class Workplace {
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
+  }
+
+  @override
+  String toString() {
+    return 'Workplace(id: $id, name: $name, ownerId: $ownerId)';
   }
 }

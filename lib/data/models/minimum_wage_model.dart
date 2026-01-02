@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class MinimumWageModel {
   final int year;
   final int wage;
@@ -11,20 +9,28 @@ class MinimumWageModel {
     required this.effectiveDate,
   });
 
-  factory MinimumWageModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  // Supabase에서 데이터 가져올 때 사용
+  factory MinimumWageModel.fromJson(Map<String, dynamic> json) {
     return MinimumWageModel(
-      year: data['year'] ?? 0,
-      wage: data['wage'] ?? 0,
-      effectiveDate: (data['effectiveDate'] as Timestamp).toDate(),
+      year: json['year'] as int? ?? 0,
+      wage: json['wage'] as int? ?? 0,
+      effectiveDate: json['effective_date'] != null
+          ? DateTime.parse(json['effective_date'] as String)
+          : DateTime.now(),
     );
   }
 
-  Map<String, dynamic> toFirestore() {
+  // Supabase에 저장할 때 사용
+  Map<String, dynamic> toJson() {
     return {
       'year': year,
       'wage': wage,
-      'effectiveDate': Timestamp.fromDate(effectiveDate),
+      'effective_date': effectiveDate.toIso8601String(),
     };
+  }
+
+  @override
+  String toString() {
+    return 'MinimumWage(year: $year, wage: $wage)';
   }
 }

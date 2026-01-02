@@ -1,31 +1,53 @@
-// lib/core/services/auth_service.dart
-
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'dart:io';
 import 'package:get/get.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/supabase_config.dart';
 
 class AuthService extends GetxService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final SupabaseClient _supabase = Supabase.instance.client;
 
+  // 현재 사용자
   Rxn<User> currentUser = Rxn<User>();
+
+  // 로그인 상태
   RxBool get isLoggedIn => (currentUser.value != null).obs;
   RxBool isInitialized = false.obs;
+
+  // ✅ OAuth 리다이렉트 처리용 flag
+  bool _isProcessingOAuth = false;
 
   Future<AuthService> init() async {
     try {
       print('AuthService 초기화 시작');
 
-      _auth.authStateChanges().listen((User? user) {
-        print('Auth state changed: ${user?.uid}');
+      // ✅ 딥링크 리스너 등록
+      _setupDeepLinkListener();
+
+      // 인증 상태 변화 리스너
+      _supabase.auth.onAuthStateChange.listen((data) {
+        final session = data.session;
+        print('Auth state changed: ${session?.user.id}');
+
         Future.delayed(const Duration(milliseconds: 50), () {
-          currentUser.value = user;
+          currentUser.value = session?.user;
+
+          // OAuth 처리 중이었다면 완료 표시
+          if (_isProcessingOAuth && session?.user != null) {
+            print('OAuth 로그인 완료!');
+            _isProcessingOAuth = false;
+          }
         });
       });
 
-      currentUser.value = _auth.currentUser;
+      // 현재 세션 확인
+      final session = _supabase.auth.currentSession;
+      currentUser.value = session?.user;
+
+      // 사용자 정보가 있으면 users 테이블에 업데이트
+      if (currentUser.value != null) {
+        await _updateUserProfile(currentUser.value!);
+      }
+
       isInitialized.value = true;
       print('AuthService 초기화 완료');
       return this;
@@ -36,104 +58,150 @@ class AuthService extends GetxService {
     }
   }
 
+  /// ✅ 딥링크 리스너 설정
+  void _setupDeepLinkListener() {
+    // Supabase가 딥링크를 자동으로 처리하도록 설정
+    // 이미 Supabase.initialize()에서 처리되지만 명시적으로 재확인
+    print('딥링크 리스너 활성화됨');
+  }
+
   /// Google 로그인
   Future<Map<String, dynamic>> signInWithGoogle() async {
     try {
       print('Google 로그인 시작');
 
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      _isProcessingOAuth = true;
 
-      if (googleUser == null) {
+      // ✅ launchMode를 externalApplication으로 설정
+      final response = await _supabase.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: Platform.isAndroid
+            ? 'com.albamanage.albam://login-callback'
+            : 'com.albamanage.albam://login-callback',
+        authScreenLaunchMode: LaunchMode.externalApplication,
+      );
+
+      if (!response) {
         print('사용자가 Google 로그인을 취소함');
+        _isProcessingOAuth = false;
         return {'success': false};
       }
 
-      print('Google 사용자 정보 획득: ${googleUser.email}');
+      print('Google 인증 화면 표시됨, 콜백 대기 중...');
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      // ✅ 인증 상태 변경을 기다림 (최대 30초)
+      int waitCount = 0;
+      while (_isProcessingOAuth && waitCount < 60) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        waitCount++;
 
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
+        // 사용자가 로그인되었는지 확인
+        if (_supabase.auth.currentUser != null) {
+          print('사용자 세션 감지됨!');
+          break;
+        }
+      }
 
-      print('Firebase 로그인 시도');
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
+        print('Google 로그인 성공: ${user.email}');
 
-      final UserCredential userCredential = await _auth.signInWithCredential(credential);
+        await _saveOrUpdateUser(
+          user: user,
+          provider: 'google',
+        );
 
-      print('Firebase 로그인 완료: ${userCredential.user?.uid}');
-
-      await _saveOrUpdateUser(
-        userCredential.user!,
-        'google',
-        name: userCredential.user!.displayName,
-        email: userCredential.user!.email,
-        profileImage: userCredential.user!.photoURL,
-      );
-
-      return {'success': true, 'user': userCredential};
-    } on FirebaseAuthException catch (e) {
-      print('Google 로그인 오류: ${e.code} / ${e.message}');
-      return {'success': false, 'error': _getErrorMessage(e)};
+        _isProcessingOAuth = false;
+        return {'success': true};
+      } else {
+        print('타임아웃: 사용자 정보를 가져오지 못함');
+        _isProcessingOAuth = false;
+        return {
+          'success': false,
+          'error': '로그인 시간이 초과되었습니다. 다시 시도해주세요.',
+        };
+      }
     } catch (e) {
-      print('Google 로그인 일반 오류: $e');
-      return {'success': false, 'error': 'Google 로그인 중 오류가 발생했습니다.'};
+      print('Google 로그인 오류: $e');
+      _isProcessingOAuth = false;
+      return {
+        'success': false,
+        'error': _getErrorMessage(e),
+      };
     }
   }
 
   /// 이메일/비밀번호 로그인
-  Future<Map<String, dynamic>> signInWithEmail(String email, String password) async {
+  Future<Map<String, dynamic>> signInWithEmail(
+      String email,
+      String password,
+      ) async {
     try {
       print('이메일 로그인 시작: $email');
 
-      final UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+      final response = await _supabase.auth.signInWithPassword(
         email: email.trim(),
         password: password,
       );
 
-      print('이메일 로그인 완료: ${userCredential.user?.uid}');
+      if (response.user == null) {
+        return {
+          'success': false,
+          'error': '로그인에 실패했습니다.',
+        };
+      }
+
+      print('이메일 로그인 완료: ${response.user?.id}');
 
       await _saveOrUpdateUser(
-        userCredential.user!,
-        'email',
-        email: userCredential.user!.email,
+        user: response.user!,
+        provider: 'email',
       );
 
-      return {'success': true, 'user': userCredential};
-    } on FirebaseAuthException catch (e) {
-      print('이메일 로그인 오류: ${e.code} / ${e.message}');
-      return {'success': false, 'error': _getErrorMessage(e)};
+      return {'success': true};
     } catch (e) {
-      print('이메일 로그인 일반 오류: $e');
-      return {'success': false, 'error': '로그인 중 오류가 발생했습니다.'};
+      print('이메일 로그인 오류: $e');
+      return {
+        'success': false,
+        'error': _getErrorMessage(e),
+      };
     }
   }
 
   /// 이메일/비밀번호 회원가입
-  Future<Map<String, dynamic>> signUpWithEmail(String email, String password) async {
+  Future<Map<String, dynamic>> signUpWithEmail(
+      String email,
+      String password,
+      ) async {
     try {
       print('이메일 회원가입 시작: $email');
 
-      final UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+      final response = await _supabase.auth.signUp(
         email: email.trim(),
         password: password,
       );
 
-      print('이메일 회원가입 완료: ${userCredential.user?.uid}');
+      if (response.user == null) {
+        return {
+          'success': false,
+          'error': '회원가입에 실패했습니다.',
+        };
+      }
+
+      print('이메일 회원가입 완료: ${response.user?.id}');
 
       await _saveOrUpdateUser(
-        userCredential.user!,
-        'email',
-        email: userCredential.user!.email,
+        user: response.user!,
+        provider: 'email',
       );
 
-      return {'success': true, 'user': userCredential};
-    } on FirebaseAuthException catch (e) {
-      print('이메일 회원가입 오류: ${e.code} / ${e.message}');
-      return {'success': false, 'error': _getErrorMessage(e)};
+      return {'success': true};
     } catch (e) {
-      print('이메일 회원가입 일반 오류: $e');
-      return {'success': false, 'error': '회원가입 중 오류가 발생했습니다.'};
+      print('이메일 회원가입 오류: $e');
+      return {
+        'success': false,
+        'error': _getErrorMessage(e),
+      };
     }
   }
 
@@ -142,42 +210,66 @@ class AuthService extends GetxService {
     try {
       print('비밀번호 재설정 이메일 전송: $email');
 
-      await _auth.sendPasswordResetEmail(email: email.trim());
+      await _supabase.auth.resetPasswordForEmail(
+        email.trim(),
+        redirectTo: 'com.albamanage.albam://reset-password',
+      );
 
       print('비밀번호 재설정 이메일 전송 완료');
       return {'success': true};
-    } on FirebaseAuthException catch (e) {
-      print('비밀번호 재설정 오류: ${e.code} / ${e.message}');
-      return {'success': false, 'error': _getErrorMessage(e)};
     } catch (e) {
-      print('비밀번호 재설정 일반 오류: $e');
-      return {'success': false, 'error': '비밀번호 재설정 중 오류가 발생했습니다.'};
+      print('비밀번호 재설정 오류: $e');
+      return {
+        'success': false,
+        'error': _getErrorMessage(e),
+      };
     }
   }
 
-  /// Firestore에 사용자 정보 저장/업데이트
-  Future<void> _saveOrUpdateUser(
-      User user,
-      String provider, {
-        String? email,
-        String? name,
-        String? profileImage,
-      }) async {
-    final userDoc = _firestore.collection('users').doc(user.uid);
+  /// users 테이블에 사용자 정보 저장/업데이트
+  Future<void> _saveOrUpdateUser({
+    required User user,
+    required String provider,
+  }) async {
+    try {
+      final userData = {
+        'id': user.id,
+        'email': user.email,
+        'name': user.userMetadata?['name'] ??
+            user.userMetadata?['full_name'] ??
+            user.email?.split('@')[0],
+        'profile_image': user.userMetadata?['avatar_url'] ??
+            user.userMetadata?['picture'],
+        'login_provider': provider,
+        'last_login_at': DateTime.now().toIso8601String(),
+      };
 
-    Map<String, dynamic> data = {
-      'loginProvider': provider,
-      'lastLoginAt': FieldValue.serverTimestamp(),
-    };
+      print('사용자 정보 저장: ${userData['email']}');
 
-    if (email != null && email.isNotEmpty) data['email'] = email;
-    if (name != null && name.isNotEmpty) data['name'] = name;
-    if (profileImage != null && profileImage.isNotEmpty) data['profileImage'] = profileImage;
+      // upsert: 있으면 업데이트, 없으면 삽입
+      await _supabase
+          .from(SupabaseConfig.usersTable)
+          .upsert(userData);
 
-    await userDoc.set({
-      ...data,
-      'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+      print('사용자 정보 저장 완료');
+    } catch (e) {
+      print('사용자 정보 저장 오류: $e');
+      // 사용자 정보 저장 실패는 치명적이지 않으므로 예외를 던지지 않음
+    }
+  }
+
+  /// users 테이블 프로필 업데이트
+  Future<void> _updateUserProfile(User user) async {
+    try {
+      await _supabase
+          .from(SupabaseConfig.usersTable)
+          .update({
+        'last_login_at': DateTime.now().toIso8601String(),
+      })
+          .eq('id', user.id);
+    } catch (e) {
+      print('프로필 업데이트 오류: $e');
+    }
   }
 
   /// 로그아웃
@@ -185,16 +277,7 @@ class AuthService extends GetxService {
     try {
       print('로그아웃 시작');
 
-      await Future.wait([
-        _googleSignIn.signOut().catchError((e) {
-          print('Google 로그아웃 오류 (무시): $e');
-          return null;
-        }),
-        _auth.signOut().catchError((e) {
-          print('Firebase 로그아웃 오류 (무시): $e');
-          return null;
-        }),
-      ]);
+      await _supabase.auth.signOut();
 
       currentUser.value = null;
       print('로그아웃 완료');
@@ -203,34 +286,45 @@ class AuthService extends GetxService {
     }
   }
 
-  /// 에러 메시지 가져오기
-  String _getErrorMessage(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'account-exists-with-different-credential':
-        return '다른 로그인 방법으로 이미 등록된 계정입니다.';
-      case 'invalid-credential':
-        return '등록되지 않은 이메일이거나 비밀번호가 올바르지 않습니다.';
-      case 'operation-not-allowed':
-        return '해당 로그인 방법이 비활성화되어 있습니다.';
-      case 'user-disabled':
-        return '비활성화된 계정입니다.';
-      case 'user-not-found':
-        return '등록되지 않은 회원입니다. 회원가입을 먼저 진행해주세요.';
-      case 'wrong-password':
-        return '비밀번호가 올바르지 않습니다.';
-      case 'invalid-email':
-        return '유효하지 않은 이메일 형식입니다.';
-      case 'email-already-in-use':
-        return '이미 사용 중인 이메일입니다.';
-      case 'weak-password':
-        return '비밀번호가 너무 약합니다. 6자 이상 입력해주세요.';
-      case 'too-many-requests':
-        return '너무 많은 시도가 있었습니다. 잠시 후 다시 시도해주세요.';
-      case 'network-request-failed':
-        return '네트워크 연결을 확인해주세요.';
-      default:
-        return '로그인에 실패했습니다. 다시 시도해주세요.';
+  /// 에러 메시지 변환
+  String _getErrorMessage(dynamic error) {
+    final errorMessage = error.toString().toLowerCase();
+
+    if (errorMessage.contains('invalid login credentials') ||
+        errorMessage.contains('invalid email or password')) {
+      return '등록되지 않은 이메일이거나 비밀번호가 올바르지 않습니다.';
     }
+
+    if (errorMessage.contains('email not confirmed')) {
+      return '이메일 인증이 필요합니다. 이메일을 확인해주세요.';
+    }
+
+    if (errorMessage.contains('user already registered')) {
+      return '이미 사용 중인 이메일입니다.';
+    }
+
+    if (errorMessage.contains('password should be at least')) {
+      return '비밀번호가 너무 약합니다. 6자 이상 입력해주세요.';
+    }
+
+    if (errorMessage.contains('email rate limit exceeded')) {
+      return '너무 많은 시도가 있었습니다. 잠시 후 다시 시도해주세요.';
+    }
+
+    if (errorMessage.contains('network')) {
+      return '네트워크 연결을 확인해주세요.';
+    }
+
+    if (errorMessage.contains('invalid email')) {
+      return '유효하지 않은 이메일 형식입니다.';
+    }
+
+    return '로그인에 실패했습니다. 다시 시도해주세요.';
   }
 
+  /// 현재 사용자 ID 반환
+  String? get userId => currentUser.value?.id;
+
+  /// 현재 사용자 이메일 반환
+  String? get userEmail => currentUser.value?.email;
 }

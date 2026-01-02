@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/services/employee_service.dart';
+import '../../core/services/schedule_service.dart';
 import '../../data/models/workplace_model.dart';
 import '../../data/models/employee_model.dart';
 import '../../data/models/schedule_model.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/utils/salary_calculator.dart';
 
 class MonthlySalarySummaryController extends GetxController {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final EmployeeService _employeeService = EmployeeService();
+  final ScheduleService _scheduleService = ScheduleService();
 
   Rxn<Workplace> workplace = Rxn<Workplace>();
   RxInt year = DateTime.now().year.obs;
@@ -33,35 +34,26 @@ class MonthlySalarySummaryController extends GetxController {
   Future<void> loadMonthlySalaries() async {
     isLoading.value = true;
     try {
-      // 직원 목록 조회
-      final employeesSnapshot = await _firestore
-          .collection(AppConstants.employeesCollection)
-          .where('workplaceId', isEqualTo: workplace.value!.id)
-          .get();
+      print('월별 급여 로드 시작: ${year.value}년 ${month.value}월');
 
-      final employees = employeesSnapshot.docs
-          .map((doc) => Employee.fromFirestore(doc))
-          .toList();
+      // 직원 목록 조회
+      final employees = await _employeeService.getEmployees(workplace.value!.id);
 
       if (employees.isEmpty) {
         monthlyStats.value = {};
         return;
       }
 
+      print('직원 수: ${employees.length}명');
+
       // 해당 월의 스케줄 조회
-      final startOfMonth = DateTime(year.value, month.value, 1);
-      final endOfMonth = DateTime(year.value, month.value + 1, 1);
+      final schedules = await _scheduleService.getMonthlySchedules(
+        workplaceId: workplace.value!.id,
+        year: year.value,
+        month: month.value,
+      );
 
-      final schedulesSnapshot = await _firestore
-          .collection(AppConstants.schedulesCollection)
-          .where('workplaceId', isEqualTo: workplace.value!.id)
-          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
-          .where('date', isLessThan: Timestamp.fromDate(endOfMonth))
-          .get();
-
-      final schedules = schedulesSnapshot.docs
-          .map((doc) => Schedule.fromFirestore(doc))
-          .toList();
+      print('스케줄 수: ${schedules.length}개');
 
       // 통계 계산
       await _calculateStats(employees, schedules);
@@ -141,6 +133,8 @@ class MonthlySalarySummaryController extends GetxController {
       'employeeCount': employeeSalaries.length,
       'employeeSalaries': employeeSalaries,
     };
+
+    print('통계 계산 완료');
   }
 
   /// 월 선택 다이얼로그

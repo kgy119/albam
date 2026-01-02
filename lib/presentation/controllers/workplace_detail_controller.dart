@@ -1,16 +1,18 @@
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/utils/snackbar_helper.dart';
 import '../../core/utils/salary_calculator.dart';
+import '../../core/services/storage_service.dart';
+import '../../core/services/employee_service.dart';
+import '../../core/services/schedule_service.dart';
 import '../../data/models/workplace_model.dart';
 import '../../data/models/employee_model.dart';
 import '../../data/models/schedule_model.dart';
-import '../../core/constants/app_constants.dart';
 
 class WorkplaceDetailController extends GetxController {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final StorageService _storageService = StorageService();
+  final EmployeeService _employeeService = EmployeeService();
+  final ScheduleService _scheduleService = ScheduleService();
 
   // 현재 사업장 정보
   late Workplace workplace;
@@ -43,7 +45,7 @@ class WorkplaceDetailController extends GetxController {
     loadEmployees();
     loadMonthlySchedules();
 
-    // 월 변경시 스케줄 다시 로드되도록 리스너 추가
+    // 월 변경시 스케줄 다시 로드
     ever(selectedDate, (date) {
       loadMonthlySchedules();
       calculateMonthlyStats();
@@ -57,21 +59,13 @@ class WorkplaceDetailController extends GetxController {
     try {
       print('사업장 ID로 직원 조회 시작: ${workplace.id}');
 
-      final querySnapshot = await _firestore
-          .collection(AppConstants.employeesCollection)
-          .where('workplaceId', isEqualTo: workplace.id)
-          .get();
+      employees.value = await _employeeService.getEmployees(workplace.id);
 
-      print('조회된 직원 수: ${querySnapshot.docs.length}');
-
-      employees.value = querySnapshot.docs
-          .map((doc) => Employee.fromFirestore(doc))
-          .toList();
-
-      print('직원 목록 로드 완료');
+      print('직원 목록 로드 완료: ${employees.length}명');
     } catch (e) {
       print('직원 목록 로드 오류: $e');
       employees.value = [];
+      SnackbarHelper.showError('직원 목록을 불러오는데 실패했습니다.');
     } finally {
       isLoadingEmployees.value = false;
     }
@@ -89,29 +83,20 @@ class WorkplaceDetailController extends GetxController {
     try {
       print('직원 추가 시작: $name');
 
-      final now = DateTime.now();
-      final employeeData = {
-        'workplaceId': workplace.id,
-        'name': name,
-        'phoneNumber': phoneNumber,
-        'hourlyWage': hourlyWage,
-        'contractImageUrl': contractImageUrl,
-        'bankName': bankName,
-        'accountNumber': accountNumber,
-        'createdAt': Timestamp.fromDate(now),
-        'updatedAt': Timestamp.fromDate(now),
-      };
+      final newEmployee = await _employeeService.addEmployee(
+        workplaceId: workplace.id,
+        name: name,
+        phoneNumber: phoneNumber,
+        hourlyWage: hourlyWage,
+        contractImageUrl: contractImageUrl,
+        bankName: bankName,
+        accountNumber: accountNumber,
+      );
 
-      await _firestore
-          .collection(AppConstants.employeesCollection)
-          .add(employeeData);
+      print('직원 추가 완료');
 
-      print('Firestore 저장 완료');
-
-      // 직원 목록 새로고침
-      await loadEmployees();
-
-      print('직원 목록 새로고침 완료');
+      // 리스트 맨 앞에 추가
+      employees.insert(0, newEmployee);
 
       return true;
     } catch (e) {
@@ -134,26 +119,19 @@ class WorkplaceDetailController extends GetxController {
     try {
       print('직원 수정 시작: $name');
 
-      final updateData = <String, dynamic>{
-        'name': name,
-        'phoneNumber': phoneNumber,
-        'hourlyWage': hourlyWage,
-        'bankName': bankName,
-        'accountNumber': accountNumber,
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
-      };
-
-      // ⭐ contractImageUrl을 항상 업데이트 (null 포함)
-      updateData['contractImageUrl'] = contractImageUrl;
-
-      await _firestore
-          .collection(AppConstants.employeesCollection)
-          .doc(employeeId)
-          .update(updateData);
+      await _employeeService.updateEmployee(
+        employeeId: employeeId,
+        name: name,
+        phoneNumber: phoneNumber,
+        hourlyWage: hourlyWage,
+        contractImageUrl: contractImageUrl,
+        bankName: bankName,
+        accountNumber: accountNumber,
+      );
 
       print('직원 정보 수정 완료');
 
-      // 직원 목록 새로고침
+      // 리스트 새로고침
       await loadEmployees();
 
       return true;
@@ -166,11 +144,9 @@ class WorkplaceDetailController extends GetxController {
 
   /// 전화번호 포맷팅
   String formatPhoneNumber(String phone) {
-    // 숫자만 추출
     String numbers = phone.replaceAll(RegExp(r'[^0-9]'), '');
 
     if (numbers.length == 11) {
-      // 010-1234-5678 형태로 포맷팅
       return '${numbers.substring(0, 3)}-${numbers.substring(3, 7)}-${numbers.substring(7)}';
     }
 
@@ -187,47 +163,24 @@ class WorkplaceDetailController extends GetxController {
   Future<bool> deleteEmployee(String employeeId) async {
     try {
       // 1. 직원 정보 가져오기
-      final employeeDoc = await _firestore
-          .collection(AppConstants.employeesCollection)
-          .doc(employeeId)
-          .get();
+      final employee = employees.firstWhere((e) => e.id == employeeId);
 
-      if (employeeDoc.exists) {
-        final employeeData = employeeDoc.data() as Map<String, dynamic>;
-        final contractImageUrl = employeeData['contractImageUrl'] as String?;
-
-        // 2. 근로계약서 이미지 삭제
-        if (contractImageUrl != null && contractImageUrl.isNotEmpty) {
-          try {
-            final ref = FirebaseStorage.instance.refFromURL(contractImageUrl);
-            await ref.delete();
-            print('근로계약서 이미지 삭제 완료');
-          } catch (e) {
-            print('이미지 삭제 오류 (무시): $e');
-          }
+      // 2. 근로계약서 이미지 삭제
+      if (employee.contractImageUrl != null &&
+          employee.contractImageUrl!.isNotEmpty) {
+        try {
+          await _storageService.deleteContractImage(employee.contractImageUrl!);
+          print('근로계약서 이미지 삭제 완료');
+        } catch (e) {
+          print('이미지 삭제 오류 (무시): $e');
         }
       }
 
-      // 3. 관련 스케줄 삭제
-      final schedulesQuery = await _firestore
-          .collection(AppConstants.schedulesCollection)
-          .where('employeeId', isEqualTo: employeeId)
-          .get();
+      // 3. 직원 삭제 (CASCADE로 스케줄도 자동 삭제됨)
+      await _employeeService.deleteEmployee(employeeId);
 
-      final batch = _firestore.batch();
-
-      for (var doc in schedulesQuery.docs) {
-        batch.delete(doc.reference);
-      }
-
-      // 4. 직원 정보 삭제
-      batch.delete(
-        _firestore.collection(AppConstants.employeesCollection).doc(employeeId),
-      );
-
-      await batch.commit();
-
-      await loadEmployees();
+      // 4. 리스트에서 제거
+      employees.removeWhere((e) => e.id == employeeId);
 
       SnackbarHelper.showSuccess('직원이 삭제되었습니다.');
       return true;
@@ -243,20 +196,12 @@ class WorkplaceDetailController extends GetxController {
     try {
       final year = selectedDate.value.year;
       final month = selectedDate.value.month;
-      final startOfMonth = DateTime(year, month, 1);
-      final endOfMonth = DateTime(year, month + 1, 1);
 
-      final querySnapshot = await _firestore
-          .collection(AppConstants.schedulesCollection)
-          .where('workplaceId', isEqualTo: workplace.id)
-          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
-          .where('date', isLessThan: Timestamp.fromDate(endOfMonth))
-          .orderBy('date')
-          .get();
-
-      monthlySchedules.value = querySnapshot.docs
-          .map((doc) => Schedule.fromFirestore(doc))
-          .toList();
+      monthlySchedules.value = await _scheduleService.getMonthlySchedules(
+        workplaceId: workplace.id,
+        year: year,
+        month: month,
+      );
 
       print('월별 스케줄 로드 완료: ${monthlySchedules.length}개');
 
@@ -288,7 +233,6 @@ class WorkplaceDetailController extends GetxController {
       double totalNetPay = 0;
       int totalWorkDays = 0;
 
-      // 직원별 급여 계산
       List<Map<String, dynamic>> employeeSalaries = [];
 
       for (var employee in employees) {
@@ -362,9 +306,9 @@ class WorkplaceDetailController extends GetxController {
     double totalHours = 0;
     for (var schedule in monthlySchedules) {
       final scheduleDate = DateTime(
-          schedule.date.year,
-          schedule.date.month,
-          schedule.date.day
+        schedule.date.year,
+        schedule.date.month,
+        schedule.date.day,
       );
 
       if (scheduleDate.isAtSameMomentAs(targetDate)) {
@@ -381,9 +325,9 @@ class WorkplaceDetailController extends GetxController {
 
     final daySchedules = monthlySchedules.where((schedule) {
       final scheduleDate = DateTime(
-          schedule.date.year,
-          schedule.date.month,
-          schedule.date.day
+        schedule.date.year,
+        schedule.date.month,
+        schedule.date.day,
       );
       return scheduleDate.isAtSameMomentAs(targetDate);
     }).toList();
@@ -422,15 +366,7 @@ class WorkplaceDetailController extends GetxController {
   /// 최신 직원 정보 가져오기
   Future<Employee?> getLatestEmployeeInfo(String employeeId) async {
     try {
-      final doc = await _firestore
-          .collection(AppConstants.employeesCollection)
-          .doc(employeeId)
-          .get();
-
-      if (doc.exists) {
-        return Employee.fromFirestore(doc);
-      }
-      return null;
+      return await _employeeService.getEmployee(employeeId);
     } catch (e) {
       print('최신 직원 정보 조회 오류: $e');
       return null;

@@ -1,12 +1,11 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
-import 'package:firebase_storage/firebase_storage.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/services/storage_service.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../controllers/workplace_detail_controller.dart';
 import '../../../data/models/employee_model.dart';
@@ -20,6 +19,8 @@ class EditEmployeeView extends StatefulWidget {
 
 class _EditEmployeeViewState extends State<EditEmployeeView> {
   final WorkplaceDetailController controller = Get.find<WorkplaceDetailController>();
+  final StorageService _storageService = StorageService();
+
   bool _isImageDeleted = false;
 
   late Employee employee;
@@ -45,7 +46,7 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
     _bankNameController = TextEditingController(text: employee.bankName ?? '');
     _accountNumberController = TextEditingController(text: employee.accountNumber ?? '');
 
-    // Firestore에서 최신 정보 가져오기
+    // 최신 정보 가져오기
     _loadLatestEmployeeInfo();
   }
 
@@ -61,16 +62,11 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
 
   Future<void> _loadLatestEmployeeInfo() async {
     try {
-      final employeeArg = Get.arguments as Employee;
+      final latestEmployee = await controller.getLatestEmployeeInfo(employee.id);
 
-      final doc = await FirebaseFirestore.instance
-          .collection(AppConstants.employeesCollection)
-          .doc(employeeArg.id)
-          .get();
-
-      if (doc.exists) {
+      if (latestEmployee != null && mounted) {
         setState(() {
-          employee = Employee.fromFirestore(doc);
+          employee = latestEmployee;
           _nameController.text = employee.name;
           _phoneController.text = employee.phoneNumber;
           _wageController.text = employee.hourlyWage.toString();
@@ -111,32 +107,26 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
         _isImageUploading = true;
       });
 
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fileName = 'contracts/${controller.workplace.id}/${timestamp}_contract.jpg';
-      final ref = FirebaseStorage.instance.ref().child(fileName);
+      print('Storage 업로드 시작');
 
-      final metadata = SettableMetadata(
-        contentType: 'image/jpeg',
-        customMetadata: {
-          'workplaceId': controller.workplace.id,
-          'uploadedAt': DateTime.now().toIso8601String(),
-        },
+      // StorageService를 통해 업로드
+      final imageUrl = await _storageService.uploadContractImage(
+        workplaceId: controller.workplace.id,
+        imageFile: _newContractImage!,
       );
 
-      final uploadTask = ref.putFile(_newContractImage!, metadata);
-      await uploadTask;
-      final downloadUrl = await ref.getDownloadURL();
-
-      print('이미지 업로드 완료: $downloadUrl');
-      return downloadUrl;
+      print('이미지 업로드 완료: $imageUrl');
+      return imageUrl;
     } catch (e) {
       print('이미지 업로드 오류: $e');
       SnackbarHelper.showError('이미지 업로드에 실패했습니다. 다시 시도해주세요.');
       return null;
     } finally {
-      setState(() {
-        _isImageUploading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isImageUploading = false;
+        });
+      }
     }
   }
 
@@ -150,14 +140,17 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
     try {
       String? newImageUrl = employee.contractImageUrl;
 
+      // 기존 이미지 삭제 처리
       if (_isImageDeleted && employee.contractImageUrl != null) {
-        await _deleteContractImage(employee.contractImageUrl!);
+        await _storageService.deleteContractImage(employee.contractImageUrl!);
         newImageUrl = null;
       }
 
+      // 새 이미지 업로드 처리
       if (_newContractImage != null) {
+        // 기존 이미지가 있고 삭제 표시가 안 되어 있으면 기존 이미지 삭제
         if (employee.contractImageUrl != null && !_isImageDeleted) {
-          await _deleteContractImage(employee.contractImageUrl!);
+          await _storageService.deleteContractImage(employee.contractImageUrl!);
         }
 
         final uploadedUrl = await _uploadImage();
@@ -177,8 +170,12 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
         phoneNumber: controller.formatPhoneNumber(_phoneController.text.trim()),
         hourlyWage: int.parse(_wageController.text.trim()),
         contractImageUrl: newImageUrl,
-        bankName: _bankNameController.text.trim().isEmpty ? null : _bankNameController.text.trim(),
-        accountNumber: _accountNumberController.text.trim().isEmpty ? null : _accountNumberController.text.trim(),
+        bankName: _bankNameController.text.trim().isEmpty
+            ? null
+            : _bankNameController.text.trim(),
+        accountNumber: _accountNumberController.text.trim().isEmpty
+            ? null
+            : _accountNumberController.text.trim(),
       );
 
       if (success) {
@@ -216,12 +213,7 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
             // 스크롤 가능한 폼 영역
             Expanded(
               child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  16,
-                  16,
-                  16,
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -564,9 +556,7 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          _isImageUploading
-                              ? '이미지 업로드 중...'
-                              : '저장 중...',
+                          _isImageUploading ? '이미지 업로드 중...' : '저장 중...',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -592,43 +582,36 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
   }
 
   void _showDeleteImageDialog() {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('근로계약서 삭제'),
-        content: const Text('첨부된 근로계약서를 삭제하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('취소'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              setState(() {
-                _isImageDeleted = true;
-              });
-              SnackbarHelper.showWarning(
-                '근로계약서가 삭제 표시되었습니다. 저장 버튼을 눌러주세요.',
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('근로계약서 삭제'),
+          content: const Text('첨부된 근로계약서를 삭제하시겠습니까?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('취소'),
             ),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                setState(() {
+                  _isImageDeleted = true;
+                });
+                SnackbarHelper.showWarning(
+                  '근로계약서가 삭제 표시되었습니다. 저장 버튼을 눌러주세요.',
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
     );
-  }
-
-  Future<void> _deleteContractImage(String imageUrl) async {
-    try {
-      final ref = FirebaseStorage.instance.refFromURL(imageUrl);
-      await ref.delete();
-      print('Firebase Storage에서 이미지 삭제 완료');
-    } catch (e) {
-      print('이미지 삭제 오류 (무시 가능): $e');
-    }
   }
 }

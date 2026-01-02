@@ -1,10 +1,11 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
 import '../../data/models/workplace_model.dart';
 import '../../core/services/workplace_service.dart';
+import '../../core/services/employee_service.dart';
 
 class WorkplaceController extends GetxController {
   late final WorkplaceService _workplaceService;
+  late final EmployeeService _employeeService;
 
   // 사업장 목록
   RxList<Workplace> workplaces = <Workplace>[].obs;
@@ -17,17 +18,18 @@ class WorkplaceController extends GetxController {
   void onInit() {
     super.onInit();
 
-    // WorkplaceService 의존성 확인
+    // 서비스 의존성 확인
     try {
       _workplaceService = Get.find<WorkplaceService>();
-      print('WorkplaceService 찾음'); // 디버깅용
+      _employeeService = EmployeeService(); // 신규 생성
+      print('WorkplaceService 찾음');
     } catch (e) {
-      print('WorkplaceService를 찾을 수 없음: $e'); // 디버깅용
+      print('WorkplaceService를 찾을 수 없음: $e');
       Get.snackbar('오류', 'WorkplaceService 초기화 실패');
       return;
     }
 
-    // 약간의 딜레이 후 사업장 목록 로드 (AuthService 완전 초기화 대기)
+    // 약간의 딜레이 후 사업장 목록 로드
     Future.delayed(const Duration(milliseconds: 500), () {
       loadWorkplaces();
     });
@@ -50,7 +52,6 @@ class WorkplaceController extends GetxController {
       if (workplaces.isEmpty) {
         print('등록된 사업장이 없습니다.');
       }
-
     } catch (e) {
       print('사업장 목록 로드 실패: $e');
       Get.snackbar(
@@ -67,14 +68,16 @@ class WorkplaceController extends GetxController {
   Future<void> addWorkplace(String name) async {
     try {
       isAdding.value = true;
-      await _workplaceService.addWorkplace(name);
 
-      // 추가 후 약간의 딜레이를 두고 새로고침
-      await Future.delayed(const Duration(milliseconds: 500));
-      await loadWorkplaces(); // 목록 새로고침
+      // Supabase에 추가하고 반환된 객체를 리스트에 추가
+      final newWorkplace = await _workplaceService.addWorkplace(name);
+
+      // 리스트 맨 앞에 추가 (최신순)
+      workplaces.insert(0, newWorkplace);
 
       Get.snackbar('성공', '사업장이 추가되었습니다.');
     } catch (e) {
+      print('사업장 추가 오류: $e');
       Get.snackbar('오류', e.toString());
     } finally {
       isAdding.value = false;
@@ -85,9 +88,13 @@ class WorkplaceController extends GetxController {
   Future<void> deleteWorkplace(String workplaceId) async {
     try {
       await _workplaceService.deleteWorkplace(workplaceId);
-      await loadWorkplaces(); // 목록 새로고침
+
+      // 리스트에서 제거
+      workplaces.removeWhere((w) => w.id == workplaceId);
+
       Get.snackbar('성공', '사업장이 삭제되었습니다.');
     } catch (e) {
+      print('사업장 삭제 오류: $e');
       Get.snackbar('오류', e.toString());
     }
   }
@@ -96,9 +103,19 @@ class WorkplaceController extends GetxController {
   Future<void> updateWorkplaceName(String workplaceId, String newName) async {
     try {
       await _workplaceService.updateWorkplace(workplaceId, newName);
-      await loadWorkplaces(); // 목록 새로고침
+
+      // 리스트에서 해당 사업장 찾아서 업데이트
+      final index = workplaces.indexWhere((w) => w.id == workplaceId);
+      if (index != -1) {
+        workplaces[index] = workplaces[index].copyWith(
+          name: newName,
+          updatedAt: DateTime.now(),
+        );
+      }
+
       Get.snackbar('성공', '사업장 정보가 수정되었습니다.');
     } catch (e) {
+      print('사업장 수정 오류: $e');
       Get.snackbar('오류', e.toString());
     }
   }
@@ -110,26 +127,11 @@ class WorkplaceController extends GetxController {
   Future<void> loadAllEmployeeCounts() async {
     try {
       for (var workplace in workplaces) {
-        final count = await _getEmployeeCount(workplace.id);
+        final count = await _employeeService.getEmployeeCount(workplace.id);
         employeeCountMap[workplace.id] = count;
       }
     } catch (e) {
       print('직원 수 조회 오류: $e');
-    }
-  }
-
-  /// 특정 사업장의 직원 수 조회
-  Future<int> _getEmployeeCount(String workplaceId) async {
-    try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('employees')
-          .where('workplaceId', isEqualTo: workplaceId)
-          .get();
-
-      return querySnapshot.docs.length;
-    } catch (e) {
-      print('사업장 $workplaceId 직원 수 조회 오류: $e');
-      return 0;
     }
   }
 

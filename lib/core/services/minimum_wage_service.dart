@@ -1,14 +1,15 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/models/minimum_wage_model.dart';
+import '../config/supabase_config.dart';
 
 class MinimumWageService extends GetxService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final SupabaseClient _supabase = Supabase.instance.client;
 
   // 캐시된 최저시급 데이터
   final RxMap<int, int> _wageCache = <int, int>{}.obs;
 
-  // 기본값 (Firebase 연결 실패 시)
+  // 기본값 (Supabase 연결 실패 시)
   static const int defaultWage2025 = 10030;
   static const int defaultWage2026 = 10320;
 
@@ -17,21 +18,25 @@ class MinimumWageService extends GetxService {
     return this;
   }
 
-  /// Firebase에서 모든 최저시급 데이터 로드
+  /// Supabase에서 모든 최저시급 데이터 로드
   Future<void> loadMinimumWages() async {
     try {
-      final querySnapshot = await _firestore
-          .collection('minimum_wages')
-          .orderBy('year')
-          .get();
+      print('최저시급 데이터 로드 시작');
+
+      final response = await _supabase
+          .from(SupabaseConfig.minimumWagesTable)
+          .select()
+          .order('year', ascending: true);
 
       _wageCache.clear();
-      for (var doc in querySnapshot.docs) {
-        final wageData = MinimumWageModel.fromFirestore(doc);
+
+      for (var json in response as List) {
+        final wageData = MinimumWageModel.fromJson(json as Map<String, dynamic>);
         _wageCache[wageData.year] = wageData.wage;
       }
 
       print('최저시급 데이터 로드 완료: ${_wageCache.length}개');
+      print('로드된 데이터: $_wageCache');
     } catch (e) {
       print('최저시급 데이터 로드 실패: $e');
       // 기본값으로 초기화
@@ -43,6 +48,7 @@ class MinimumWageService extends GetxService {
   void _initializeDefaultWages() {
     _wageCache[2025] = defaultWage2025;
     _wageCache[2026] = defaultWage2026;
+    print('기본 최저시급 데이터 설정: $_wageCache');
   }
 
   /// 현재 날짜 기준 최저시급 반환
@@ -81,23 +87,25 @@ class MinimumWageService extends GetxService {
     return getMinimumWageByYear(date.year);
   }
 
-  /// 관리자용: 최저시급 추가/업데이트 (선택사항)
+  /// 관리자용: 최저시급 추가/업데이트
   Future<void> updateMinimumWage({
     required int year,
     required int wage,
     required DateTime effectiveDate,
   }) async {
     try {
+      print('최저시급 업데이트 시작: $year년 - $wage원');
+
       final wageData = MinimumWageModel(
         year: year,
         wage: wage,
         effectiveDate: effectiveDate,
       );
 
-      await _firestore
-          .collection('minimum_wages')
-          .doc(year.toString())
-          .set(wageData.toFirestore());
+      // upsert: 있으면 업데이트, 없으면 삽입
+      await _supabase
+          .from(SupabaseConfig.minimumWagesTable)
+          .upsert(wageData.toJson());
 
       // 캐시 업데이트
       _wageCache[year] = wage;
@@ -106,6 +114,23 @@ class MinimumWageService extends GetxService {
     } catch (e) {
       print('최저시급 업데이트 실패: $e');
       throw Exception('최저시급 업데이트 실패');
+    }
+  }
+
+  /// 모든 최저시급 데이터 조회 (관리자용)
+  Future<List<MinimumWageModel>> getAllMinimumWages() async {
+    try {
+      final response = await _supabase
+          .from(SupabaseConfig.minimumWagesTable)
+          .select()
+          .order('year', ascending: false);
+
+      return (response as List)
+          .map((json) => MinimumWageModel.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      print('전체 최저시급 조회 오류: $e');
+      return [];
     }
   }
 }

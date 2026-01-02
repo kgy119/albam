@@ -1,16 +1,17 @@
 import 'package:get/get.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/services/employee_service.dart';
+import '../../core/services/schedule_service.dart';
 import '../../data/models/employee_model.dart';
 import '../../data/models/schedule_model.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/utils/salary_calculator.dart';
 
 class SalaryController extends GetxController {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final EmployeeService _employeeService = EmployeeService();
+  final ScheduleService _scheduleService = ScheduleService();
 
   RxBool isLoading = false.obs;
   Rxn<Map<String, dynamic>> salaryData = Rxn<Map<String, dynamic>>();
-  Rxn<Employee> currentEmployee = Rxn<Employee>(); // 현재 직원 정보 저장
+  Rxn<Employee> currentEmployee = Rxn<Employee>();
 
   RxList<Schedule> monthlySchedules = <Schedule>[].obs;
   RxInt selectedDay = 0.obs;
@@ -45,41 +46,31 @@ class SalaryController extends GetxController {
     isLoading.value = true;
     try {
       // 최신 직원 정보 다시 가져오기 (시급 변경 등 반영)
-      final employeeDoc = await _firestore
-          .collection(AppConstants.employeesCollection)
-          .doc(employee.id)
-          .get();
+      final latestEmployee = await _employeeService.getEmployee(employee.id);
 
-      if (!employeeDoc.exists) {
+      if (latestEmployee == null) {
         Get.snackbar('오류', '직원 정보를 찾을 수 없습니다.');
         return;
       }
 
-      final latestEmployee = Employee.fromFirestore(employeeDoc);
       currentEmployee.value = latestEmployee;
 
-      final startOfMonth = DateTime(year, month, 1);
-      final endOfMonth = DateTime(year, month + 1, 1);
-
-      final querySnapshot = await _firestore
-          .collection(AppConstants.schedulesCollection)
-          .where('employeeId', isEqualTo: latestEmployee.id)
-          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
-          .where('date', isLessThan: Timestamp.fromDate(endOfMonth))
-          .orderBy('date')
-          .get();
-
-      final schedules = querySnapshot.docs
-          .map((doc) => Schedule.fromFirestore(doc))
-          .toList();
+      // 월별 스케줄 조회
+      final schedules = await _scheduleService.getEmployeeMonthlySchedules(
+        employeeId: latestEmployee.id,
+        year: year,
+        month: month,
+      );
 
       monthlySchedules.value = schedules;
 
+      // 급여 계산
       salaryData.value = SalaryCalculator.calculateMonthlySalary(
         schedules: schedules,
         hourlyWage: latestEmployee.hourlyWage.toDouble(),
       );
 
+      print('급여 계산 완료');
     } catch (e) {
       print('급여 계산 오류: $e');
       Get.snackbar('오류', '급여 계산 중 문제가 발생했습니다.');

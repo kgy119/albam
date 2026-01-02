@@ -1,15 +1,13 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class Schedule {
   final String id;
   final String workplaceId;
   final String employeeId;
-  final String employeeName; // 조회 편의를 위해 이름도 저장
+  final String employeeName;
   final DateTime date;
   final DateTime startTime;
   final DateTime endTime;
-  final int totalMinutes; // 총 근무 시간 (분 단위)
-  final bool isSubstitute; // 대체근무 여부 추가
+  final int totalMinutes;
+  final bool isSubstitute;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -27,35 +25,75 @@ class Schedule {
     required this.updatedAt,
   });
 
-  factory Schedule.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  // Supabase에서 데이터 가져올 때 사용
+  factory Schedule.fromJson(Map<String, dynamic> json) {
     return Schedule(
-      id: doc.id,
-      workplaceId: data['workplaceId'] ?? '',
-      employeeId: data['employeeId'] ?? '',
-      employeeName: data['employeeName'] ?? '',
-      date: (data['date'] as Timestamp).toDate(),
-      startTime: (data['startTime'] as Timestamp).toDate(),
-      endTime: (data['endTime'] as Timestamp).toDate(),
-      totalMinutes: data['totalMinutes'] ?? 0,
-      isSubstitute: data['isSubstitute'] ?? false,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      id: json['id'] as String,
+      workplaceId: json['workplace_id'] as String? ?? '',
+      employeeId: json['employee_id'] as String? ?? '',
+      employeeName: json['employee_name'] as String? ?? '',
+      date: json['date'] != null
+          ? DateTime.parse(json['date'] as String)
+          : DateTime.now(),
+      startTime: json['start_time'] != null
+          ? DateTime.parse(json['start_time'] as String)
+          : DateTime.now(),
+      endTime: json['end_time'] != null
+          ? DateTime.parse(json['end_time'] as String)
+          : DateTime.now(),
+      totalMinutes: json['total_minutes'] as int? ?? 0,
+      isSubstitute: json['is_substitute'] as bool? ?? false,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
+          : DateTime.now(),
     );
   }
 
-  Map<String, dynamic> toFirestore() {
+  // Supabase에 저장할 때 사용
+  Map<String, dynamic> toJson() {
     return {
-      'workplaceId': workplaceId,
-      'employeeId': employeeId,
-      'employeeName': employeeName,
-      'date': Timestamp.fromDate(date),
-      'startTime': Timestamp.fromDate(startTime),
-      'endTime': Timestamp.fromDate(endTime),
-      'totalMinutes': totalMinutes,
-      'isSubstitute': isSubstitute,
-      'createdAt': Timestamp.fromDate(createdAt),
-      'updatedAt': Timestamp.fromDate(updatedAt),
+      'id': id,
+      'workplace_id': workplaceId,
+      'employee_id': employeeId,
+      'employee_name': employeeName,
+      'date': date.toIso8601String(),
+      'start_time': startTime.toIso8601String(),
+      'end_time': endTime.toIso8601String(),
+      'total_minutes': totalMinutes,
+      'is_substitute': isSubstitute,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+
+  // Insert용 (id 제외)
+  Map<String, dynamic> toInsertJson() {
+    return {
+      'workplace_id': workplaceId,
+      'employee_id': employeeId,
+      'employee_name': employeeName,
+      'date': date.toIso8601String(),
+      'start_time': startTime.toIso8601String(),
+      'end_time': endTime.toIso8601String(),
+      'total_minutes': totalMinutes,
+      'is_substitute': isSubstitute,
+      // created_at, updated_at은 DB에서 자동 생성
+    };
+  }
+
+  // Update용
+  Map<String, dynamic> toUpdateJson() {
+    return {
+      'employee_id': employeeId,
+      'employee_name': employeeName,
+      'start_time': startTime.toIso8601String(),
+      'end_time': endTime.toIso8601String(),
+      'total_minutes': totalMinutes,
+      'is_substitute': isSubstitute,
+      // updated_at은 트리거에서 자동 업데이트
     };
   }
 
@@ -83,5 +121,10 @@ class Schedule {
   /// 시간 계산 유틸리티
   static int calculateTotalMinutes(DateTime startTime, DateTime endTime) {
     return endTime.difference(startTime).inMinutes;
+  }
+
+  @override
+  String toString() {
+    return 'Schedule(id: $id, employeeName: $employeeName, date: $date, totalMinutes: $totalMinutes)';
   }
 }
