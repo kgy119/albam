@@ -35,7 +35,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: '알밤',
+      title: '알바관리',
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
       initialRoute: AppRoutes.login,
