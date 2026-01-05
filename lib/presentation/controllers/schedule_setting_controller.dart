@@ -892,4 +892,29 @@ class ScheduleSettingController extends GetxController {
         },
     );
   }
+
+  /// 해당일 전체 스케줄 삭제
+  Future<void> deleteAllSchedules() async {
+    if (schedules.isEmpty) {
+      Get.snackbar('알림', '삭제할 스케줄이 없습니다.');
+      return;
+    }
+
+    try {
+      isSaving.value = true;
+
+      Get.snackbar(
+        '완료',
+        '${selectedDate.month}/${selectedDate.day}일의 모든 스케줄이 삭제되었습니다.',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+    } catch (e) {
+      print('스케줄 삭제 오류: $e');
+      Get.snackbar('오류', '스케줄 삭제에 실패했습니다.');
+    } finally {
+      isSaving.value = false;
+    }
+  }
 }

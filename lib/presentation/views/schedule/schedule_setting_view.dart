@@ -36,6 +36,15 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
           ],
         ),
         actions: [
+          // 전체 삭제 버튼 추가
+          Obx(() => IconButton(
+            icon: const Icon(Icons.delete_sweep),
+            onPressed: controller.schedules.isEmpty
+                ? null
+                : () => _showDeleteAllDialog(),
+            tooltip: '전체 삭제',
+            color: Colors.red,
+          )),
           IconButton(
             icon: const Icon(Icons.copy),
             onPressed: () => controller.showCopyScheduleDialog(),
@@ -613,6 +622,67 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
               foregroundColor: Colors.white,
             ),
             child: const Text('복사'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 전체 스케줄 삭제 확인 다이얼로그
+  void _showDeleteAllDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('전체 스케줄 삭제'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${controller.selectedDate.month}/${controller.selectedDate.day}일의',
+            ),
+            const Text('모든 스케줄을 삭제하시겠습니까?'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.red[700], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '총 ${controller.schedules.length}개의 스케줄이 영구적으로 삭제됩니다.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              controller.deleteAllSchedules();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('전체 삭제'),
           ),
         ],
       ),
