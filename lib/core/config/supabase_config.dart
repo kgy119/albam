@@ -1,5 +1,4 @@
 class SupabaseConfig {
-  // ⚠️ 반드시 실제 프로젝트 정보로 교체!
   static const String supabaseUrl = 'https://iuzusurmnktpfqunfjsh.supabase.co';
   static const String supabaseAnonKey = 'sb_publishable_x1jx7atThjG3joiLRrv3ZA_MBBT38bu';
 
