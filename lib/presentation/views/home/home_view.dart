@@ -124,6 +124,8 @@ class HomeView extends GetView<WorkplaceController> {
   }
 
   // _buildWorkplaceCard 메서드 수정
+  // _buildWorkplaceCard 메서드에서 IconButton 부분 수정
+
   Widget _buildWorkplaceCard(workplace, BuildContext context) {
     return Card(
       child: InkWell(
@@ -182,11 +184,36 @@ class HomeView extends GetView<WorkplaceController> {
                       ],
                     ),
                   ),
-                  IconButton(
+
+                  // ✅ PopupMenuButton으로 변경
+                  PopupMenuButton<String>(
                     icon: const Icon(Icons.more_vert),
-                    onPressed: () {
-                      // 메뉴 처리
-                    },
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    onSelected: (value) => _handleMenuSelection(value, workplace.id),
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit, size: 18),
+                            SizedBox(width: 10),
+                            Text('이름 수정'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, color: Colors.red, size: 18),
+                            SizedBox(width: 10),
+                            Text('삭제', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -217,6 +244,92 @@ class HomeView extends GetView<WorkplaceController> {
           ),
         ),
       ),
+    );
+  }
+
+// _handleMenuSelection 메서드 (이미 있음, 확인용)
+  void _handleMenuSelection(String value, String workplaceId) {
+    switch (value) {
+      case 'edit':
+        _showEditWorkplaceDialog(workplaceId);
+        break;
+      case 'delete':
+        _showDeleteConfirmDialog(workplaceId);
+        break;
+    }
+  }
+
+// _showEditWorkplaceDialog 메서드 (이미 있음)
+  void _showEditWorkplaceDialog(String workplaceId) {
+    final workplace = controller.workplaces.firstWhere((w) => w.id == workplaceId);
+    final TextEditingController nameController = TextEditingController(text: workplace.name);
+
+    showDialog(
+      context: Get.context!,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('사업장 이름 수정'),
+          content: TextField(
+            controller: nameController,
+            decoration: const InputDecoration(
+              labelText: '사업장 이름',
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final newName = nameController.text.trim();
+                if (newName.isNotEmpty) {
+                  Navigator.of(context).pop();
+                  await Future.delayed(const Duration(milliseconds: 200));
+                  await controller.updateWorkplaceName(workplaceId, newName);
+                }
+              },
+              child: const Text('수정'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+// _showDeleteConfirmDialog 메서드 (이미 있음)
+  void _showDeleteConfirmDialog(String workplaceId) {
+    final workplace = controller.workplaces.firstWhere((w) => w.id == workplaceId);
+
+    showDialog(
+      context: Get.context!,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('사업장 삭제'),
+          content: Text('\'${workplace.name}\' 사업장을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await Future.delayed(const Duration(milliseconds: 200));
+                await controller.deleteWorkplace(workplaceId);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -267,123 +380,8 @@ class HomeView extends GetView<WorkplaceController> {
     );
   }
 
-  Widget _buildInfoChip({
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 14,
-            color: color,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: color,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showAddWorkplaceDialog() {
     Get.dialog(AddWorkplaceDialog());
-  }
-
-  void _handleMenuSelection(String value, String workplaceId) {
-    switch (value) {
-      case 'edit':
-        _showEditWorkplaceDialog(workplaceId);
-        break;
-      case 'delete':
-        _showDeleteConfirmDialog(workplaceId);
-        break;
-    }
-  }
-
-  void _showEditWorkplaceDialog(String workplaceId) {
-    final workplace = controller.workplaces.firstWhere((w) => w.id == workplaceId);
-    final TextEditingController nameController = TextEditingController(text: workplace.name);
-
-    showDialog(
-      context: Get.context!,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('사업장 이름 수정'),
-          content: TextField(
-            controller: nameController,
-            decoration: const InputDecoration(
-              labelText: '사업장 이름',
-            ),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('취소'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final newName = nameController.text.trim();
-                if (newName.isNotEmpty) {
-                  Navigator.of(context).pop(); // Get.back() 대신 사용
-                  await Future.delayed(const Duration(milliseconds: 200));
-                  await controller.updateWorkplaceName(workplaceId, newName);
-                }
-              },
-              child: const Text('수정'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showDeleteConfirmDialog(String workplaceId) {
-    final workplace = controller.workplaces.firstWhere((w) => w.id == workplaceId);
-
-    showDialog(
-      context: Get.context!,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('사업장 삭제'),
-          content: Text('\'${workplace.name}\' 사업장을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('취소'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.of(context).pop(); // Get.back() 대신 사용
-                await Future.delayed(const Duration(milliseconds: 200));
-                await controller.deleteWorkplace(workplaceId);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('삭제'),
-            ),
-          ],
-        );
-      },
-    );
   }
 }

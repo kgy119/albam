@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../core/utils/snackbar_helper.dart';
 import '../controllers/workplace_controller.dart';
 
 class AddWorkplaceDialog extends StatelessWidget {
@@ -51,15 +52,14 @@ class AddWorkplaceDialog extends StatelessWidget {
   void _addWorkplace() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      Get.snackbar('알림', '사업장 이름을 입력해주세요.');
+      SnackbarHelper.showWarning('사업장 이름을 입력해주세요.'); // 수정
       return;
     }
 
-    // 먼저 다이얼로그 닫기
     Navigator.of(Get.context!).pop();
 
-    // 약간의 딜레이 후 사업장 추가
     await Future.delayed(const Duration(milliseconds: 200));
     await _controller.addWorkplace(name);
   }
+
 }

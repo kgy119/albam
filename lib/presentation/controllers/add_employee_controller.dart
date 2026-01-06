@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'dart:io';
 import '../../core/constants/app_constants.dart';
 import '../../core/services/storage_service.dart';
+import '../../core/utils/snackbar_helper.dart';
 import '../../data/models/workplace_model.dart';
 import '../controllers/workplace_detail_controller.dart';
 
@@ -95,13 +96,8 @@ class AddEmployeeController extends GetxController {
         selectedImage.value = File(image.path);
       }
     } catch (e) {
-      Get.snackbar('오류', '이미지를 선택할 수 없습니다.');
+      SnackbarHelper.showError('이미지를 선택할 수 없습니다.'); // 수정
     }
-  }
-
-  /// 이미지 제거
-  void removeImage() {
-    selectedImage.value = null;
   }
 
   /// 이미지 Supabase Storage에 업로드
@@ -113,7 +109,6 @@ class AddEmployeeController extends GetxController {
 
       print('Storage 업로드 시작');
 
-      // StorageService를 통해 업로드
       final imageUrl = await _storageService.uploadContractImage(
         workplaceId: workplace.id,
         imageFile: selectedImage.value!,
@@ -123,7 +118,7 @@ class AddEmployeeController extends GetxController {
       return imageUrl;
     } catch (e) {
       print('이미지 업로드 오류: $e');
-      Get.snackbar('오류', '이미지 업로드에 실패했습니다. 다시 시도해주세요.');
+      SnackbarHelper.showError('이미지 업로드에 실패했습니다. 다시 시도해주세요.'); // 수정
       return null;
     } finally {
       isImageUploading.value = false;
@@ -137,18 +132,15 @@ class AddEmployeeController extends GetxController {
     isLoading.value = true;
 
     try {
-      // 이미지 업로드 (있는 경우)
       String? contractImageUrl;
       if (selectedImage.value != null) {
         contractImageUrl = await _uploadImage();
         if (contractImageUrl == null) {
-          // 이미지 업로드 실패시 중단
           isLoading.value = false;
           return;
         }
       }
 
-      // WorkplaceDetailController 찾기 및 직원 추가
       final workplaceController = Get.find<WorkplaceDetailController>();
 
       final success = await workplaceController.addEmployee(
@@ -167,7 +159,6 @@ class AddEmployeeController extends GetxController {
       if (success) {
         print('직원 추가 성공 - 화면 이동');
 
-        // 성공 결과와 직원 이름을 함께 반환
         Get.back(result: {
           'success': true,
           'employeeName': nameController.text.trim(),
@@ -177,17 +168,18 @@ class AddEmployeeController extends GetxController {
       }
     } catch (e) {
       print('직원 추가 예외 오류: $e');
-      Get.snackbar(
-        '오류',
-        '직원 추가 중 오류가 발생했습니다.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Get.theme.colorScheme.error,
-        colorText: Get.theme.colorScheme.onError,
-      );
+      SnackbarHelper.showError('직원 추가 중 오류가 발생했습니다.'); // 수정
     } finally {
       isLoading.value = false;
     }
   }
+
+
+  /// 이미지 제거
+  void removeImage() {
+    selectedImage.value = null;
+  }
+
 
   /// 전화번호 포맷팅
   String formatPhoneNumber(String phone) {

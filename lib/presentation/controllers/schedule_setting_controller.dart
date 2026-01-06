@@ -43,7 +43,7 @@ class ScheduleSettingController extends GetxController {
       employees.value = await _employeeService.getEmployees(workplace.id);
     } catch (e) {
       print('직원 목록 로드 오류: $e');
-      Get.snackbar('오류', '직원 목록을 불러오는데 실패했습니다.');
+      SnackbarHelper.showError('직원 목록을 불러오는데 실패했습니다.'); // 수정
     }
   }
 
@@ -60,7 +60,7 @@ class ScheduleSettingController extends GetxController {
       print('스케줄 로드 완료: ${schedules.length}개');
     } catch (e) {
       print('스케줄 로드 오류: $e');
-      Get.snackbar('오류', '스케줄을 불러오는데 실패했습니다.');
+      SnackbarHelper.showError('스케줄을 불러오는데 실패했습니다.'); // 수정
     } finally {
       isLoading.value = false;
     }
@@ -74,10 +74,8 @@ class ScheduleSettingController extends GetxController {
     bool isSubstitute = false,
   }) async {
     try {
-      // 직원 정보 찾기
       final employee = employees.firstWhere((e) => e.id == employeeId);
 
-      // DateTime 객체 생성
       final startDateTime = DateTime(
         selectedDate.year,
         selectedDate.month,
@@ -94,16 +92,14 @@ class ScheduleSettingController extends GetxController {
         endTime.minute,
       );
 
-      // 종료시간이 시작시간보다 이른 경우 다음날로 설정
       final actualEndDateTime = endDateTime.isBefore(startDateTime)
           ? endDateTime.add(const Duration(days: 1))
           : endDateTime;
 
-      // 총 근무시간 계산
       final totalMinutes = Schedule.calculateTotalMinutes(startDateTime, actualEndDateTime);
 
       if (totalMinutes <= 0) {
-        Get.snackbar('오류', '종료시간이 시작시간보다 늦어야 합니다.');
+        SnackbarHelper.showWarning('종료시간이 시작시간보다 늦어야 합니다.'); // 수정
         return;
       }
 
@@ -118,11 +114,11 @@ class ScheduleSettingController extends GetxController {
         isSubstitute: isSubstitute,
       );
 
-      await loadSchedules(); // 목록 새로고침
-      Get.snackbar('성공', '스케줄이 추가되었습니다.');
+      await loadSchedules();
+      SnackbarHelper.showSuccess('스케줄이 추가되었습니다.'); // 수정
     } catch (e) {
       print('스케줄 추가 오류: $e');
-      Get.snackbar('오류', '스케줄 추가에 실패했습니다.');
+      SnackbarHelper.showError('스케줄 추가에 실패했습니다.'); // 수정
     }
   }
 
@@ -130,37 +126,12 @@ class ScheduleSettingController extends GetxController {
   Future<void> deleteSchedule(String scheduleId) async {
     try {
       await _scheduleService.deleteSchedule(scheduleId);
-      await loadSchedules(); // 목록 새로고침
-      Get.snackbar('성공', '스케줄이 삭제되었습니다.');
+      await loadSchedules();
+      SnackbarHelper.showSuccess('스케줄이 삭제되었습니다.'); // 수정
     } catch (e) {
       print('스케줄 삭제 오류: $e');
-      Get.snackbar('오류', '스케줄 삭제에 실패했습니다.');
+      SnackbarHelper.showError('스케줄 삭제에 실패했습니다.'); // 수정
     }
-  }
-
-  /// 해당 날짜의 총 근무시간 계산
-  String getTotalWorkTime() {
-    if (schedules.isEmpty) return '0시간 0분';
-
-    final totalMinutes = schedules.fold<int>(0, (sum, schedule) => sum + schedule.totalMinutes);
-    final hours = totalMinutes ~/ 60;
-    final minutes = totalMinutes % 60;
-
-    return '${hours}시간 ${minutes}분';
-  }
-
-  /// 시간 선택 다이얼로그 표시
-  Future<TimeOfDay?> selectTime(BuildContext context, {TimeOfDay? initialTime}) async {
-    return await showTimePicker(
-      context: context,
-      initialTime: initialTime ?? TimeOfDay.now(),
-      builder: (context, child) {
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
-          child: child!,
-        );
-      },
-    );
   }
 
   /// 스케줄 수정
@@ -197,7 +168,7 @@ class ScheduleSettingController extends GetxController {
       final totalMinutes = Schedule.calculateTotalMinutes(startDateTime, actualEndDateTime);
 
       if (totalMinutes <= 0) {
-        Get.snackbar('오류', '종료시간이 시작시간보다 늦어야 합니다.');
+        SnackbarHelper.showWarning('종료시간이 시작시간보다 늦어야 합니다.'); // 수정
         return;
       }
 
@@ -212,12 +183,39 @@ class ScheduleSettingController extends GetxController {
       );
 
       await loadSchedules();
-      Get.snackbar('성공', '스케줄이 수정되었습니다.');
+      SnackbarHelper.showSuccess('스케줄이 수정되었습니다.'); // 수정
     } catch (e) {
       print('스케줄 수정 오류: $e');
-      Get.snackbar('오류', '스케줄 수정에 실패했습니다.');
+      SnackbarHelper.showError('스케줄 수정에 실패했습니다.'); // 수정
     }
   }
+
+
+  /// 해당 날짜의 총 근무시간 계산
+  String getTotalWorkTime() {
+    if (schedules.isEmpty) return '0시간 0분';
+
+    final totalMinutes = schedules.fold<int>(0, (sum, schedule) => sum + schedule.totalMinutes);
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+
+    return '${hours}시간 ${minutes}분';
+  }
+
+  /// 시간 선택 다이얼로그 표시
+  Future<TimeOfDay?> selectTime(BuildContext context, {TimeOfDay? initialTime}) async {
+    return await showTimePicker(
+      context: context,
+      initialTime: initialTime ?? TimeOfDay.now(),
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
+    );
+  }
+
 
   /// 스케줄이 있는 날짜들 조회
   Future<List<DateTime>> getScheduleDates() async {
@@ -372,7 +370,7 @@ class ScheduleSettingController extends GetxController {
   /// 스케줄 추가 다이얼로그 표시
   void showAddScheduleDialog() {
     if (employees.isEmpty) {
-      Get.snackbar('알림', '등록된 직원이 없습니다.');
+      SnackbarHelper.showWarning('등록된 직원이 없습니다.'); // 수정
       return;
     }
 

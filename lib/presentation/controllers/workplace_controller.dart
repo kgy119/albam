@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import '../../core/utils/snackbar_helper.dart';
 import '../../data/models/workplace_model.dart';
 import '../../core/services/workplace_service.dart';
 import '../../core/services/employee_service.dart';
@@ -46,7 +47,6 @@ class WorkplaceController extends GetxController {
 
       print('사업장 목록 로드 완료: ${workplaces.length}개');
 
-      // 직원 수도 함께 로드
       await loadAllEmployeeCounts();
 
       if (workplaces.isEmpty) {
@@ -54,31 +54,25 @@ class WorkplaceController extends GetxController {
       }
     } catch (e) {
       print('사업장 목록 로드 실패: $e');
-      Get.snackbar(
-        '오류',
-        e.toString(),
-        duration: const Duration(seconds: 5),
-      );
+      SnackbarHelper.showError(e.toString()); // 수정
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// 사업장 추가
+
   Future<void> addWorkplace(String name) async {
     try {
       isAdding.value = true;
 
-      // Supabase에 추가하고 반환된 객체를 리스트에 추가
       final newWorkplace = await _workplaceService.addWorkplace(name);
 
-      // 리스트 맨 앞에 추가 (최신순)
       workplaces.insert(0, newWorkplace);
 
-      Get.snackbar('성공', '사업장이 추가되었습니다.');
+      SnackbarHelper.showSuccess('사업장이 추가되었습니다.'); // 수정
     } catch (e) {
       print('사업장 추가 오류: $e');
-      Get.snackbar('오류', e.toString());
+      SnackbarHelper.showError(e.toString()); // 수정
     } finally {
       isAdding.value = false;
     }
@@ -89,13 +83,12 @@ class WorkplaceController extends GetxController {
     try {
       await _workplaceService.deleteWorkplace(workplaceId);
 
-      // 리스트에서 제거
       workplaces.removeWhere((w) => w.id == workplaceId);
 
-      Get.snackbar('성공', '사업장이 삭제되었습니다.');
+      SnackbarHelper.showSuccess('사업장이 삭제되었습니다.'); // 수정
     } catch (e) {
       print('사업장 삭제 오류: $e');
-      Get.snackbar('오류', e.toString());
+      SnackbarHelper.showError(e.toString()); // 수정
     }
   }
 
@@ -104,7 +97,6 @@ class WorkplaceController extends GetxController {
     try {
       await _workplaceService.updateWorkplace(workplaceId, newName);
 
-      // 리스트에서 해당 사업장 찾아서 업데이트
       final index = workplaces.indexWhere((w) => w.id == workplaceId);
       if (index != -1) {
         workplaces[index] = workplaces[index].copyWith(
@@ -113,10 +105,10 @@ class WorkplaceController extends GetxController {
         );
       }
 
-      Get.snackbar('성공', '사업장 정보가 수정되었습니다.');
+      SnackbarHelper.showSuccess('사업장 정보가 수정되었습니다.'); // 수정
     } catch (e) {
       print('사업장 수정 오류: $e');
-      Get.snackbar('오류', e.toString());
+      SnackbarHelper.showError(e.toString()); // 수정
     }
   }
 

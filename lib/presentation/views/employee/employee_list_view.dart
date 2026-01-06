@@ -6,6 +6,7 @@ import '../../../app/theme/app_theme.dart';
 import '../../controllers/workplace_detail_controller.dart';
 import '../../../app/routes/app_routes.dart';
 import 'package:intl/intl.dart';
+import '../../../core/utils/snackbar_helper.dart'; // ✅ 추가
 
 class EmployeeListView extends GetView<WorkplaceDetailController> {
   const EmployeeListView({super.key});
@@ -33,7 +34,7 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
                 16,
                 16,
                 16,
-                MediaQuery.of(context).padding.bottom // FloatingActionButton 공간 확보
+                MediaQuery.of(context).padding.bottom
             ),
             itemCount: controller.employees.length,
             itemBuilder: (context, index) {
@@ -53,22 +54,14 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
             },
           );
 
-          // 직원 추가 성공시 처리
           if (result != null && result['success'] == true) {
             print('직원 추가 성공 - 목록 새로고침 및 스낵바 표시');
 
-            // 목록 새로고침
             await controller.loadEmployees();
 
-            // 성공 스낵바 표시
-            Get.snackbar(
-              '완료',
+            // ✅ Get.snackbar → SnackbarHelper로 변경
+            SnackbarHelper.showSuccess(
               '${result['employeeName']} 직원이 성공적으로 등록되었습니다.',
-              snackPosition: SnackPosition.BOTTOM,
-              backgroundColor: Colors.green,
-              colorText: Colors.white,
-              duration: const Duration(seconds: 3),
-              margin: const EdgeInsets.all(10),
             );
           }
         },
@@ -108,7 +101,6 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
     );
   }
 
-  // employee_list_view.dart의 _buildEmployeeCard 수정
   Widget _buildEmployeeCard(employee) {
     final currencyFormatter = NumberFormat.currency(locale: 'ko_KR', symbol: '');
 
@@ -123,7 +115,6 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
             children: [
               Row(
                 children: [
-                  // 프로필 아바타
                   Container(
                     width: 52,
                     height: 52,
@@ -240,7 +231,6 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
               const Divider(height: 1),
               const SizedBox(height: 14),
 
-              // 시급 정보
               Row(
                 children: [
                   Expanded(
@@ -281,7 +271,6 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
                 ],
               ),
 
-              // 근로계약서 표시
               if (employee.contractImageUrl != null) ...[
                 const SizedBox(height: 8),
                 Row(
@@ -310,7 +299,6 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
     );
   }
 
-  // 전화 걸기
   Future<void> _makePhoneCall(String phoneNumber) async {
     final cleanNumber = phoneNumber.replaceAll('-', '');
     final Uri phoneUri = Uri(scheme: 'tel', path: cleanNumber);
@@ -319,27 +307,16 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
       if (await canLaunchUrl(phoneUri)) {
         await launchUrl(phoneUri);
       } else {
-        // 전화 걸기가 안 되면 자동으로 복사
         _copyPhoneNumber(phoneNumber);
       }
     } catch (e) {
-      // 오류 발생시 복사로 대체
       _copyPhoneNumber(phoneNumber);
     }
   }
 
-// 전화번호 복사
   void _copyPhoneNumber(String phoneNumber) {
     Clipboard.setData(ClipboardData(text: phoneNumber));
-    Get.snackbar(
-      '복사완료',
-      '전화번호가 복사되었습니다.',
-      snackPosition: SnackPosition.BOTTOM,
-      duration: const Duration(seconds: 2),
-      backgroundColor: Colors.green,
-      colorText: Colors.white,
-      margin: const EdgeInsets.all(10),
-    );
+    SnackbarHelper.showCopied('전화번호가 복사되었습니다.'); // ✅ 수정
   }
 
   void _showDeleteDialog(employee) {
@@ -366,17 +343,16 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
   }
 
   void _showEditDialog(employee) async {
-    // ⭐ 최신 직원 정보 다시 가져오기
     final latestEmployee = await controller.getLatestEmployeeInfo(employee.id);
 
     if (latestEmployee == null) {
-      Get.snackbar('오류', '직원 정보를 불러올 수 없습니다.');
+      SnackbarHelper.showError('직원 정보를 불러올 수 없습니다.'); // ✅ 수정
       return;
     }
 
     final result = await Get.toNamed(
       '/edit-employee',
-      arguments: latestEmployee, // ⭐ 최신 정보 전달
+      arguments: latestEmployee,
     );
 
     if (result == true) {
@@ -395,7 +371,6 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 년도 선택
             DropdownButtonFormField<int>(
               decoration: const InputDecoration(
                 labelText: '년도',
@@ -415,7 +390,6 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
             ),
             const SizedBox(height: 16),
 
-            // 월 선택
             DropdownButtonFormField<int>(
               decoration: const InputDecoration(
                 labelText: '월',

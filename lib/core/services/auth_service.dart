@@ -226,6 +226,8 @@ class AuthService extends GetxService {
     }
   }
 
+  // lib/core/services/auth_service.dart
+
   /// users 테이블에 사용자 정보 저장/업데이트
   Future<void> _saveOrUpdateUser({
     required User user,
@@ -246,10 +248,36 @@ class AuthService extends GetxService {
 
       print('사용자 정보 저장: ${userData['email']}');
 
-      // upsert: 있으면 업데이트, 없으면 삽입
-      await _supabase
-          .from(SupabaseConfig.usersTable)
-          .upsert(userData);
+      // ✅ upsert 대신 명시적으로 확인 후 처리
+      try {
+        // 먼저 사용자가 존재하는지 확인
+        final existing = await _supabase
+            .from(SupabaseConfig.usersTable)
+            .select('id')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        if (existing == null) {
+          // 새 사용자 추가
+          await _supabase
+              .from(SupabaseConfig.usersTable)
+              .insert({
+            ...userData,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+          print('신규 사용자 추가 완료');
+        } else {
+          // 기존 사용자 업데이트
+          await _supabase
+              .from(SupabaseConfig.usersTable)
+              .update(userData)
+              .eq('id', user.id);
+          print('기존 사용자 정보 업데이트 완료');
+        }
+      } catch (e) {
+        print('사용자 정보 저장 상세 오류: $e');
+        // 실패해도 로그인은 계속 진행
+      }
 
       print('사용자 정보 저장 완료');
     } catch (e) {
