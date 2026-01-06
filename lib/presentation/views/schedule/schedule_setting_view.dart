@@ -36,32 +36,55 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
           ],
         ),
         actions: [
-          // 전체 삭제 버튼 추가
-          Obx(() => IconButton(
-            icon: const Icon(Icons.delete_sweep),
-            onPressed: controller.schedules.isEmpty
-                ? null
-                : () => _showDeleteAllDialog(),
-            tooltip: '전체 삭제',
-            color: Colors.red,
-          )),
-          IconButton(
-            icon: const Icon(Icons.copy),
-            onPressed: () => controller.showCopyScheduleDialog(),
-            tooltip: '다른 날 복사',
-          ),
+          // 총 근무시간
           Obx(() => Padding(
-            padding: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.only(right: 8),
             child: Center(
               child: Text(
                 '총 ${controller.getTotalWorkTime()}',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                  fontSize: 13,
                 ),
               ),
             ),
           )),
+
+          // 메뉴 버튼
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: '메뉴',
+            onSelected: (value) {
+              if (value == 'copy') {
+                controller.showCopyScheduleDialog();
+              } else if (value == 'delete_all') {
+                _showDeleteAllDialog();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'copy',
+                child: Row(
+                  children: [
+                    Icon(Icons.copy, size: 20),
+                    SizedBox(width: 12),
+                    Text('다른 날 복사'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'delete_all',
+                enabled: controller.schedules.isNotEmpty,
+                child: const Row(
+                  children: [
+                    Icon(Icons.delete_sweep, size: 20, color: Colors.red),
+                    SizedBox(width: 12),
+                    Text('전체 삭제', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       body: Obx(() {
@@ -365,40 +388,58 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
 
 
   Widget _buildTimeBar(schedule) {
-    // 시작 시간을 0~24시간 범위로 정규화
+    // 전체 스케줄의 최소/최대 시간 계산
+    double minHour = 24.0;
+    double maxHour = 0.0;
+
+    for (var s in controller.schedules) {
+      final startHour = s.startTime.hour + (s.startTime.minute / 60.0);
+      final endHour = s.endTime.hour + (s.endTime.minute / 60.0);
+
+      if (startHour < minHour) minHour = startHour;
+      if (endHour > maxHour) maxHour = endHour;
+    }
+
+    // 현재 스케줄의 시간
     final startHour = schedule.startTime.hour + (schedule.startTime.minute / 60.0);
     final endHour = schedule.endTime.hour + (schedule.endTime.minute / 60.0);
 
-    // 24시간 기준으로 비율 계산
-    final startRatio = startHour / 24.0;
-    final duration = (endHour > startHour ? endHour - startHour : (24 - startHour) + endHour) / 24.0;
+    // 전체 범위 대비 비율 계산
+    final totalRange = maxHour - minHour;
+    final startRatio = (startHour - minHour) / totalRange;
+    final duration = (endHour - startHour) / totalRange;
 
-    return Container(
-      height: 8,
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            left: MediaQuery.of(Get.context!).size.width * 0.8 * startRatio,
-            child: Container(
-              width: MediaQuery.of(Get.context!).size.width * 0.8 * duration,
-              height: 8,
-              decoration: BoxDecoration(
-                color: schedule.isSubstitute
-                    ? Colors.orange // 대체근무시 다른 색상
-                    : Theme.of(Get.context!).primaryColor,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+
+        return Container(
+          height: 8,
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(4),
           ),
-        ],
-      ),
+          child: Stack(
+            children: [
+              Positioned(
+                left: maxWidth * startRatio,
+                child: Container(
+                  width: maxWidth * duration,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: schedule.isSubstitute
+                        ? Colors.orange
+                        : Theme.of(Get.context!).primaryColor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
-
 
   void _showDeleteDialog(schedule) {
     Get.dialog(
@@ -630,62 +671,67 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
 
   /// 전체 스케줄 삭제 확인 다이얼로그
   void _showDeleteAllDialog() {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('전체 스케줄 삭제'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${controller.selectedDate.month}/${controller.selectedDate.day}일의',
-            ),
-            const Text('모든 스케줄을 삭제하시겠습니까?'),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red[200]!),
+    showDialog(
+      context: Get.context!,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('전체 스케줄 삭제'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${controller.selectedDate.month}/${controller.selectedDate.day}일의',
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.warning, color: Colors.red[700], size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '총 ${controller.schedules.length}개의 스케줄이 영구적으로 삭제됩니다.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.red[700],
-                        fontWeight: FontWeight.w500,
+              const Text('모든 스케줄을 삭제하시겠습니까?'),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning, color: Colors.red[700], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '총 ${controller.schedules.length}개의 스케줄이 영구적으로 삭제됩니다.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.red[700],
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop(); // dialogContext 사용
+                await Future.delayed(const Duration(milliseconds: 200));
+                await controller.deleteAllSchedules();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('전체 삭제'),
             ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('취소'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              controller.deleteAllSchedules();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('전체 삭제'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../core/utils/date_utils.dart' as date_utils;
 import '../../core/services/employee_service.dart';
 import '../../core/services/schedule_service.dart';
+import '../../core/utils/snackbar_helper.dart';
 import '../../data/models/workplace_model.dart';
 import '../../data/models/employee_model.dart';
 import '../../data/models/schedule_model.dart';
@@ -304,7 +305,7 @@ class ScheduleSettingController extends GetxController {
       final sourceSchedules = await getSchedulesByDate(sourceDate);
 
       if (sourceSchedules.isEmpty) {
-        Get.snackbar('알림', '선택한 날짜에 복사할 스케줄이 없습니다.');
+        SnackbarHelper.showWarning('선택한 날짜에 복사할 스케줄이 없습니다.');
         return;
       }
 
@@ -356,16 +357,13 @@ class ScheduleSettingController extends GetxController {
       final deletedCount = existingSchedules.length;
       final addedCount = sourceSchedules.length;
 
-      Get.snackbar(
-        '완료',
+      // ✅ Get.snackbar 대신 SnackbarHelper 사용
+      SnackbarHelper.showSuccess(
         '기존 스케줄 $deletedCount개 삭제 후\n${sourceDate.month}/${sourceDate.day}일 스케줄 $addedCount개가 복사되었습니다.',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 3),
       );
     } catch (e) {
       print('스케줄 복사 오류: $e');
-      Get.snackbar('오류', '스케줄 복사에 실패했습니다.');
+      SnackbarHelper.showError('스케줄 복사에 실패했습니다.');
     } finally {
       isSaving.value = false;
     }
@@ -896,23 +894,30 @@ class ScheduleSettingController extends GetxController {
   /// 해당일 전체 스케줄 삭제
   Future<void> deleteAllSchedules() async {
     if (schedules.isEmpty) {
-      Get.snackbar('알림', '삭제할 스케줄이 없습니다.');
+      SnackbarHelper.showWarning('삭제할 스케줄이 없습니다.');
       return;
     }
 
     try {
       isSaving.value = true;
 
-      Get.snackbar(
-        '완료',
-        '${selectedDate.month}/${selectedDate.day}일의 모든 스케줄이 삭제되었습니다.',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 2),
+      // 모든 스케줄 ID 수집
+      final scheduleIds = schedules.map((s) => s.id).toList();
+      final deleteCount = scheduleIds.length;
+
+      // 일괄 삭제
+      await _scheduleService.deleteSchedules(scheduleIds);
+
+      // 로컬 리스트 초기화
+      schedules.clear();
+
+      // SnackbarHelper 사용
+      SnackbarHelper.showSuccess(
+        '${selectedDate.month}/${selectedDate.day}일의 스케줄 ${deleteCount}개가 삭제되었습니다.',
       );
     } catch (e) {
       print('스케줄 삭제 오류: $e');
-      Get.snackbar('오류', '스케줄 삭제에 실패했습니다.');
+      SnackbarHelper.showError('스케줄 삭제에 실패했습니다.');
     } finally {
       isSaving.value = false;
     }
