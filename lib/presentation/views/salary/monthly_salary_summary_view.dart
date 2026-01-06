@@ -26,7 +26,18 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
           ),
         ],
       ),
-        body: SafeArea(  // SafeArea 추가
+      body: SafeArea(
+        child: GestureDetector(
+          onHorizontalDragEnd: (details) {
+            // 오른쪽으로 스와이프 (이전 달)
+            if (details.primaryVelocity! > 0) {
+              controller.goToPreviousMonth();
+            }
+            // 왼쪽으로 스와이프 (다음 달)
+            else if (details.primaryVelocity! < 0) {
+              controller.goToNextMonth();
+            }
+          },
           child: Obx(() {
             if (controller.isLoading.value) {
               return const Center(child: CircularProgressIndicator());
@@ -34,19 +45,20 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
 
             final stats = controller.monthlyStats.value;
             if (stats.isEmpty) {
-              return const Center(
-                child: Text('이번 달 급여 데이터가 없습니다.'),
-              );
+              return _buildEmptyState();
             }
 
             final employeeSalaries = stats['employeeSalaries'] as List<Map<String, dynamic>>;
 
             return SingleChildScrollView(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).padding.bottom + 16, // 하단 패딩 추가
+                bottom: MediaQuery.of(context).padding.bottom + 16,
               ),
               child: Column(
                 children: [
+                  // 스와이프 안내
+                  _buildSwipeHint(),
+
                   // 전체 통계 요약
                   _buildTotalSummaryCard(stats, currencyFormat),
 
@@ -73,6 +85,112 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
             );
           }),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSwipeHint() {
+    return Obx(() => Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue[200]!),
+      ),
+      child: Row(
+        children: [
+          // 이전 달 버튼
+          InkWell(
+            onTap: controller.goToPreviousMonth,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              child: Icon(
+                Icons.chevron_left,
+                color: Colors.blue[700],
+                size: 28,
+              ),
+            ),
+          ),
+
+          // 년월 표시
+          Expanded(
+            child: Column(
+              children: [
+                Text(
+                  '${controller.year.value}년 ${controller.month.value}월',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue[900],
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.swipe, size: 12, color: Colors.blue[600]),
+                    const SizedBox(width: 4),
+                    Text(
+                      '좌우 스와이프',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.blue[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // 다음 달 버튼
+          InkWell(
+            onTap: controller.goToNextMonth,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              child: Icon(
+                Icons.chevron_right,
+                color: Colors.blue[700],
+                size: 28,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ));
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.receipt_long_outlined,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            '이번 달 급여 데이터가 없습니다.',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '좌우로 스와이프하여 다른 달을 확인하세요',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -192,6 +310,10 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
     final salaryData = item['salaryData'] as Map<String, dynamic>;
     final workDays = item['workDays'] as int;
 
+    // 주휴수당 시간
+    final weeklyHolidayHours = (salaryData['weeklyHolidayHours'] as num?)?.toDouble() ?? 0.0;
+    final hasWeeklyHoliday = weeklyHolidayHours > 0;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -271,7 +393,7 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
                 ],
               ),
 
-              // 계좌번호 정보 추가
+              // 계좌번호 정보
               if (employee.bankName != null && employee.accountNumber != null) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -329,25 +451,34 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
               ],
 
               const SizedBox(height: 12),
-              Row(
+
+              // 근무 정보 칩들
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   _buildInfoChip(
                     '${salaryData['totalHours'].toStringAsFixed(1)}시간',
                     Icons.access_time,
                     Colors.blue,
                   ),
-                  const SizedBox(width: 8),
                   _buildInfoChip(
                     '$workDays일',
                     Icons.calendar_today,
                     Colors.green,
                   ),
-                  const SizedBox(width: 8),
                   if (salaryData['substituteHours'] > 0)
                     _buildInfoChip(
                       '대체 ${salaryData['substituteHours'].toStringAsFixed(1)}h',
                       Icons.swap_horiz,
                       Colors.orange,
+                    ),
+                  // 주휴수당 표시
+                  if (hasWeeklyHoliday)
+                    _buildInfoChip(
+                      '주휴 ${weeklyHolidayHours.toStringAsFixed(1)}h',
+                      Icons.card_giftcard,
+                      Colors.green,
                     ),
                 ],
               ),

@@ -55,19 +55,36 @@ class SalaryController extends GetxController {
 
       currentEmployee.value = latestEmployee;
 
-      // 월별 스케줄 조회
+      // 현재 월 스케줄 조회
       final schedules = await _scheduleService.getEmployeeMonthlySchedules(
         employeeId: latestEmployee.id,
         year: year,
         month: month,
       );
 
+      // 전달 스케줄 조회 (0주차 주휴수당 계산용)
+      List<Schedule> previousMonthSchedules = [];
+      if (month == 1) {
+        previousMonthSchedules = await _scheduleService.getEmployeeMonthlySchedules(
+          employeeId: latestEmployee.id,
+          year: year - 1,
+          month: 12,
+        );
+      } else {
+        previousMonthSchedules = await _scheduleService.getEmployeeMonthlySchedules(
+          employeeId: latestEmployee.id,
+          year: year,
+          month: month - 1,
+        );
+      }
+
       monthlySchedules.value = schedules;
 
-      // 급여 계산
+      // 급여 계산 (전달 스케줄 포함)
       salaryData.value = SalaryCalculator.calculateMonthlySalary(
         schedules: schedules,
         hourlyWage: latestEmployee.hourlyWage.toDouble(),
+        previousMonthSchedules: previousMonthSchedules,
       );
 
       print('급여 계산 완료');
@@ -122,6 +139,7 @@ class SalaryController extends GetxController {
 
   int getFirstDayOfWeek(int year, int month) {
     final firstDay = DateTime(year, month, 1);
+    // 일요일 기준 (0: 일요일, 1: 월요일, ..., 6: 토요일)
     return firstDay.weekday % 7;
   }
 

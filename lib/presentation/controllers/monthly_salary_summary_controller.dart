@@ -30,6 +30,28 @@ class MonthlySalarySummaryController extends GetxController {
     loadMonthlySalaries();
   }
 
+  /// 이전 달로 이동
+  void goToPreviousMonth() {
+    if (month.value == 1) {
+      year.value -= 1;
+      month.value = 12;
+    } else {
+      month.value -= 1;
+    }
+    loadMonthlySalaries();
+  }
+
+  /// 다음 달로 이동
+  void goToNextMonth() {
+    if (month.value == 12) {
+      year.value += 1;
+      month.value = 1;
+    } else {
+      month.value += 1;
+    }
+    loadMonthlySalaries();
+  }
+
   /// 월별 급여 로드
   Future<void> loadMonthlySalaries() async {
     isLoading.value = true;
@@ -55,8 +77,24 @@ class MonthlySalarySummaryController extends GetxController {
 
       print('스케줄 수: ${schedules.length}개');
 
+      // 전달 스케줄 조회 (주휴수당 계산용)
+      List<Schedule> previousMonthSchedules = [];
+      if (month.value == 1) {
+        previousMonthSchedules = await _scheduleService.getMonthlySchedules(
+          workplaceId: workplace.value!.id,
+          year: year.value - 1,
+          month: 12,
+        );
+      } else {
+        previousMonthSchedules = await _scheduleService.getMonthlySchedules(
+          workplaceId: workplace.value!.id,
+          year: year.value,
+          month: month.value - 1,
+        );
+      }
+
       // 통계 계산
-      await _calculateStats(employees, schedules);
+      await _calculateStats(employees, schedules, previousMonthSchedules);
     } catch (e) {
       print('급여 로드 오류: $e');
       Get.snackbar('오류', '급여 정보를 불러오는데 실패했습니다.');
@@ -66,7 +104,11 @@ class MonthlySalarySummaryController extends GetxController {
   }
 
   /// 통계 계산
-  Future<void> _calculateStats(List<Employee> employees, List<Schedule> schedules) async {
+  Future<void> _calculateStats(
+      List<Employee> employees,
+      List<Schedule> schedules,
+      List<Schedule> previousMonthSchedules,
+      ) async {
     double totalHours = 0;
     double totalRegularHours = 0;
     double totalSubstituteHours = 0;
@@ -86,9 +128,15 @@ class MonthlySalarySummaryController extends GetxController {
 
       if (employeeSchedules.isEmpty) continue;
 
+      // 해당 직원의 전달 스케줄
+      final employeePreviousSchedules = previousMonthSchedules
+          .where((schedule) => schedule.employeeId == employee.id)
+          .toList();
+
       final salaryData = SalaryCalculator.calculateMonthlySalary(
         schedules: employeeSchedules,
         hourlyWage: employee.hourlyWage.toDouble(),
+        previousMonthSchedules: employeePreviousSchedules,
       );
 
       final workDays = employeeSchedules

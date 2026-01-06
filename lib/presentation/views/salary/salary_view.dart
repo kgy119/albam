@@ -235,7 +235,7 @@ class SalaryView extends GetView<SalaryController> {
               child: _buildCalendarGrid(year, month),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
             // 선택된 날짜의 상세 스케줄
             Obx(() {
@@ -268,7 +268,7 @@ class SalaryView extends GetView<SalaryController> {
     );
   }
 
-  /// 요일 헤더
+  /// 요일 헤더 (일요일 시작)
   Widget _buildWeekHeader() {
     const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -316,6 +316,34 @@ class SalaryView extends GetView<SalaryController> {
     );
   }
 
+  Widget _buildInfoBox() {
+    final now = DateTime.now();
+    final currentYear = now.year;
+    final currentMinWage = AppConstants.getCurrentMinimumWage();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: Colors.blue[700]),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '일용직 급여 계산 ($currentYear년 최저시급: ${NumberFormat.currency(locale: 'ko_KR', symbol: '').format(currentMinWage)}원)\n• 기본급: 시급 × 근무시간\n• 주휴수당: 일~토 기준 주 15시간 이상 근무 시 지급 (일평균 근무시간, 최대 8시간)',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.blue[700],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildCalendarDay(int day, int year, int month) {
     return Obx(() {
@@ -634,6 +662,12 @@ class SalaryView extends GetView<SalaryController> {
   }
 
   Widget _buildWeeklyBreakdownCard(Map<String, dynamic> salaryData) {
+    final weeklyBreakdown = salaryData['weeklyBreakdown'] as Map<int, Map<String, dynamic>>;
+
+    // 주차별로 정렬
+    final sortedEntries = weeklyBreakdown.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -647,81 +681,141 @@ class SalaryView extends GetView<SalaryController> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
-            ...(salaryData['weeklyBreakdown'] as Map<int, double>)
-                .entries
-                .map((entry) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('${entry.key + 1}주차'),
-                  Row(
-                    children: [
-                      Text(
-                        '${entry.value.toStringAsFixed(1)} 시간',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (entry.value >= AppConstants.weeklyHolidayMinHours) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            '주휴',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ))
-                .toList(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoBox() {
-    final now = DateTime.now();
-    final currentYear = now.year;
-    final currentMinWage = AppConstants.getCurrentMinimumWage();
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.blue[50],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.info_outline, color: Colors.blue[700]),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '일용직 급여 계산 ($currentYear년 최저시급: ${NumberFormat.currency(locale: 'ko_KR', symbol: '').format(currentMinWage)}원)\n• 기본급: 시급 × 근무시간\n• 주휴수당: 주 15시간 이상 근무 시 지급 (일평균 근무시간, 최대 8시간)',
+            const SizedBox(height: 8),
+            Text(
+              '※ 일요일~토요일 기준',
               style: TextStyle(
-                fontSize: 12,
-                color: Colors.blue[700],
+                fontSize: 11,
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            ...sortedEntries.map((entry) {
+              final weekNumber = entry.key;
+              final hours = entry.value;
+              final regularHours = (hours['regular'] as double?) ?? 0;
+              final substituteHours = (hours['substitute'] as double?) ?? 0;
+              final weeklyHolidayFromPrevious = (hours['weeklyHolidayFromPrevious'] as double?) ?? 0;
+              final weeklyHolidayHours = (hours['weeklyHolidayHours'] as double?) ?? 0;
+              final totalHours = (hours['total'] as double?) ?? 0;
+
+              // 주휴수당 발생 여부
+              final hasWeeklyHoliday = weeklyHolidayHours > 0;
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${weekNumber}주차',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            Text(
+                              '${totalHours.toStringAsFixed(1)} 시간',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                            if (hasWeeklyHoliday) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.green,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  '주휴',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 주휴수당 시간 표시
+                          if (weeklyHolidayHours > 0) ...[
+                            Row(
+                              children: [
+                                Icon(Icons.add_circle_outline, size: 14, color: Colors.green[700]),
+                                const SizedBox(width: 4),
+                                Text(
+                                  weeklyHolidayFromPrevious > 0
+                                      ? '전월 연결 주휴수당 ${weeklyHolidayHours.toStringAsFixed(1)}h'
+                                      : '주휴수당 ${weeklyHolidayHours.toStringAsFixed(1)}h',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.green[700],
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                          ],
+                          // 현재 달 근무시간
+                          Row(
+                            children: [
+                              if (regularHours > 0) ...[
+                                Icon(Icons.work_outline, size: 14, color: Colors.blue[700]),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '정규 ${regularHours.toStringAsFixed(1)}h',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.blue[700],
+                                  ),
+                                ),
+                              ],
+                              if (regularHours > 0 && substituteHours > 0)
+                                const SizedBox(width: 12),
+                              if (substituteHours > 0) ...[
+                                Icon(Icons.swap_horiz, size: 14, color: Colors.orange[700]),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '대체 ${substituteHours.toStringAsFixed(1)}h',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.orange[700],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ],
+        ),
       ),
     );
   }

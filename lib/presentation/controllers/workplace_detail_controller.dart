@@ -222,6 +222,25 @@ class WorkplaceDetailController extends GetxController {
 
     isLoadingStats.value = true;
     try {
+      // 전달 스케줄 조회
+      List<Schedule> previousMonthSchedules = [];
+      final currentYear = selectedDate.value.year;
+      final currentMonth = selectedDate.value.month;
+
+      if (currentMonth == 1) {
+        previousMonthSchedules = await _scheduleService.getMonthlySchedules(
+          workplaceId: workplace.id,
+          year: currentYear - 1,
+          month: 12,
+        );
+      } else {
+        previousMonthSchedules = await _scheduleService.getMonthlySchedules(
+          workplaceId: workplace.id,
+          year: currentYear,
+          month: currentMonth - 1,
+        );
+      }
+
       double totalHours = 0;
       double totalRegularHours = 0;
       double totalSubstituteHours = 0;
@@ -243,10 +262,16 @@ class WorkplaceDetailController extends GetxController {
 
         if (employeeSchedules.isEmpty) continue;
 
-        // 급여 계산
+        // 해당 직원의 전달 스케줄 필터링
+        final employeePreviousSchedules = previousMonthSchedules
+            .where((schedule) => schedule.employeeId == employee.id)
+            .toList();
+
+        // 급여 계산 (전달 스케줄 포함)
         final salaryData = SalaryCalculator.calculateMonthlySalary(
           schedules: employeeSchedules,
           hourlyWage: employee.hourlyWage.toDouble(),
+          previousMonthSchedules: employeePreviousSchedules,
         );
 
         // 근무일수 계산
