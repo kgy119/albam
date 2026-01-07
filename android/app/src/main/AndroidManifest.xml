@@ -24,7 +24,7 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
 
-            <!-- ✅ Supabase OAuth 딥링크 -->
+            <!-- Supabase OAuth 딥링크 (로그인) -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -33,6 +33,29 @@
                 <data
                     android:scheme="com.albamanage.albam"
                     android:host="login-callback" />
+            </intent-filter>
+
+            <!-- ✅ 비밀번호 재설정 딥링크 추가 -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="com.albamanage.albam"
+                    android:host="reset-password" />
+            </intent-filter>
+
+            <!-- ✅ Supabase URL 스킴 (이메일 링크용) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="https"
+                    android:host="iuzusurmnktpfqunfjsh.supabase.co"
+                    android:pathPrefix="/auth/v1/verify" />
             </intent-filter>
         </activity>
 

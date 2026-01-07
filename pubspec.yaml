@@ -19,6 +19,7 @@ dependencies:
 
   # Supabase 추가
   supabase_flutter: ^2.5.0
+  package_info_plus: ^9.0.0
 
 dev_dependencies:
   flutter_test:

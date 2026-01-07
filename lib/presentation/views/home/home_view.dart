@@ -19,8 +19,9 @@ class HomeView extends GetView<WorkplaceController> {
         title: const Text('내 사업장'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => _showLogoutDialog(authService),
+            icon: const Icon(Icons.settings),
+            onPressed: () => Get.toNamed(AppRoutes.accountSettings),
+            tooltip: '설정',
           ),
         ],
       ),

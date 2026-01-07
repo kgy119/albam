@@ -60,8 +60,32 @@ class AuthService extends GetxService {
 
   /// ✅ 딥링크 리스너 설정
   void _setupDeepLinkListener() {
-    // Supabase가 딥링크를 자동으로 처리하도록 설정
-    // 이미 Supabase.initialize()에서 처리되지만 명시적으로 재확인
+    _supabase.auth.onAuthStateChange.listen((data) {
+      final event = data.event;
+      final session = data.session;
+
+      print('Auth event: $event');
+
+      // ✅ 비밀번호 재설정 이벤트 처리
+      if (event == AuthChangeEvent.passwordRecovery) {
+        print('비밀번호 재설정 토큰 감지');
+
+        // 비밀번호 재설정 화면으로 이동
+        Future.delayed(const Duration(milliseconds: 500), () {
+          Get.offAllNamed('/reset-password');
+        });
+      }
+
+      Future.delayed(const Duration(milliseconds: 50), () {
+        currentUser.value = session?.user;
+
+        if (_isProcessingOAuth && session?.user != null) {
+          print('OAuth 로그인 완료!');
+          _isProcessingOAuth = false;
+        }
+      });
+    });
+
     print('딥링크 리스너 활성화됨');
   }
 
@@ -72,13 +96,18 @@ class AuthService extends GetxService {
 
       _isProcessingOAuth = true;
 
-      // ✅ launchMode를 externalApplication으로 설정
+      // ✅ iOS와 Android 리다이렉트 URL 분리
+      final redirectUrl = Platform.isIOS
+          ? 'com.albamanage.albam://login-callback'
+          : 'com.albamanage.albam://login-callback';
+
       final response = await _supabase.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: Platform.isAndroid
-            ? 'com.albamanage.albam://login-callback'
-            : 'com.albamanage.albam://login-callback',
+        redirectTo: redirectUrl,
         authScreenLaunchMode: LaunchMode.externalApplication,
+        queryParams: {
+          'prompt': 'select_account',
+        },
       );
 
       if (!response) {
@@ -89,13 +118,14 @@ class AuthService extends GetxService {
 
       print('Google 인증 화면 표시됨, 콜백 대기 중...');
 
-      // ✅ 인증 상태 변경을 기다림 (최대 30초)
+      // ✅ iOS는 더 긴 대기 시간 필요
       int waitCount = 0;
-      while (_isProcessingOAuth && waitCount < 60) {
+      int maxWait = Platform.isIOS ? 120 : 60; // iOS: 60초, Android: 30초
+
+      while (_isProcessingOAuth && waitCount < maxWait) {
         await Future.delayed(const Duration(milliseconds: 500));
         waitCount++;
 
-        // 사용자가 로그인되었는지 확인
         if (_supabase.auth.currentUser != null) {
           print('사용자 세션 감지됨!');
           break;
@@ -105,6 +135,12 @@ class AuthService extends GetxService {
       final user = _supabase.auth.currentUser;
       if (user != null) {
         print('Google 로그인 성공: ${user.email}');
+
+        // 탈퇴 신청 여부 확인
+        final deletionCheck = await _checkAccountDeletion(user.id);
+        if (!deletionCheck['success']) {
+          return deletionCheck;
+        }
 
         await _saveOrUpdateUser(
           user: user,
@@ -131,7 +167,7 @@ class AuthService extends GetxService {
     }
   }
 
-  /// 이메일/비밀번호 로그인
+  //// 이메일/비밀번호 로그인
   Future<Map<String, dynamic>> signInWithEmail(
       String email,
       String password,
@@ -152,6 +188,12 @@ class AuthService extends GetxService {
       }
 
       print('이메일 로그인 완료: ${response.user?.id}');
+
+      // ✅ 탈퇴 신청 여부 확인
+      final deletionCheck = await _checkAccountDeletion(response.user!.id);
+      if (!deletionCheck['success']) {
+        return deletionCheck;
+      }
 
       await _saveOrUpdateUser(
         user: response.user!,
@@ -314,7 +356,80 @@ class AuthService extends GetxService {
     }
   }
 
-  /// 에러 메시지 변환
+  /// 계정 탈퇴 신청 여부 확인
+  Future<Map<String, dynamic>> _checkAccountDeletion(String userId) async {
+    try {
+      final userData = await _supabase
+          .from(SupabaseConfig.usersTable)
+          .select('deleted_at, delete_scheduled_at')
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (userData != null && userData['deleted_at'] != null) {
+        print('⚠️ 탈퇴 신청된 계정 로그인 시도: $userId');
+
+        // 로그아웃 처리
+        await _supabase.auth.signOut();
+
+        final scheduledDate = userData['delete_scheduled_at'] != null
+            ? DateTime.parse(userData['delete_scheduled_at'] as String)
+            : null;
+
+        String errorMessage = '탈퇴 신청된 계정입니다.';
+
+        if (scheduledDate != null) {
+          final daysLeft = scheduledDate.difference(DateTime.now()).inDays;
+          if (daysLeft > 0) {
+            errorMessage += '\n$daysLeft일 후 완전히 삭제됩니다.';
+            errorMessage += '\n복구를 원하시면 고객센터로 문의해주세요.';
+          } else {
+            errorMessage += '\n곧 완전히 삭제될 예정입니다.';
+          }
+        }
+
+        return {
+          'success': false,
+          'error': errorMessage,
+          'isDeleted': true,
+          'scheduledDate': scheduledDate,
+        };
+      }
+
+      return {'success': true};
+    } catch (e) {
+      print('탈퇴 확인 오류: $e');
+      // 오류 발생 시 로그인 허용 (안전장치)
+      return {'success': true};
+    }
+  }
+
+  /// 비밀번호 업데이트
+  Future<Map<String, dynamic>> updatePassword(String newPassword) async {
+    try {
+      print('비밀번호 업데이트 시작');
+
+      final response = await _supabase.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+
+      if (response.user == null) {
+        return {
+          'success': false,
+          'error': '비밀번호 변경에 실패했습니다.',
+        };
+      }
+
+      print('비밀번호 업데이트 완료');
+      return {'success': true};
+    } catch (e) {
+      print('비밀번호 업데이트 오류: $e');
+      return {
+        'success': false,
+        'error': _getErrorMessage(e),
+      };
+    }
+  }
+
   String _getErrorMessage(dynamic error) {
     final errorMessage = error.toString().toLowerCase();
 
@@ -323,8 +438,9 @@ class AuthService extends GetxService {
       return '등록되지 않은 이메일이거나 비밀번호가 올바르지 않습니다.';
     }
 
+    // ✅ 이메일 미인증 에러 추가
     if (errorMessage.contains('email not confirmed')) {
-      return '이메일 인증이 필요합니다. 이메일을 확인해주세요.';
+      return '이메일 인증이 완료되지 않았습니다.\n가입 시 받은 인증 이메일을 확인해주세요.';
     }
 
     if (errorMessage.contains('user already registered')) {

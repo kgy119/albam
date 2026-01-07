@@ -162,6 +162,7 @@ class LoginView extends GetView<AuthController> {
                 const SizedBox(height: 8),
 
                 // 에러/성공 메시지 표시
+                // 에러/성공 메시지 표시
                 Obx(() {
                   final error = controller.errorMessage.value;
                   final success = controller.successMessage.value;
@@ -174,32 +175,34 @@ class LoginView extends GetView<AuthController> {
                     children: [
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(16), // ✅ 패딩 증가
                         margin: const EdgeInsets.only(bottom: 8),
                         decoration: BoxDecoration(
                           color: error.isNotEmpty
                               ? Colors.red.withOpacity(0.1)
                               : Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12), // ✅ 라운드 증가
                           border: Border.all(
                             color: error.isNotEmpty ? Colors.red : Colors.green,
-                            width: 1,
+                            width: 2, // ✅ 테두리 두께 증가
                           ),
                         ),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start, // ✅ 변경
                           children: [
                             Icon(
-                              error.isNotEmpty ? Icons.error_outline : Icons.check_circle_outline,
+                              error.isNotEmpty ? Icons.error_outline : Icons.mark_email_read, // ✅ 아이콘 변경
                               color: error.isNotEmpty ? Colors.red : Colors.green,
-                              size: 20,
+                              size: 24, // ✅ 아이콘 크기 증가
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Text(
                                 error.isNotEmpty ? error : success,
                                 style: TextStyle(
                                   color: error.isNotEmpty ? Colors.red[700] : Colors.green[700],
-                                  fontSize: 13,
+                                  fontSize: 14, // ✅ 폰트 크기 증가
+                                  height: 1.5, // ✅ 줄간격
                                 ),
                               ),
                             ),

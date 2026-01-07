@@ -40,16 +40,39 @@ class WorkplaceDetailController extends GetxController {
   void onInit() {
     super.onInit();
     workplace = Get.arguments as Workplace;
+  }
 
-    // 초기 데이터 로드
-    loadEmployees();
-    loadMonthlySchedules();
+  @override
+  void onReady() {
+    super.onReady();
 
-    // 월 변경시 스케줄 다시 로드
+    print('=== WorkplaceDetailController onReady 시작 ===');
+    print('사업장: ${workplace.name}');
+    print('현재 날짜: ${selectedDate.value}');
+
+    _loadInitialData();
+
     ever(selectedDate, (date) {
+      print('월 변경됨: ${date.year}년 ${date.month}월');
       loadMonthlySchedules();
       calculateMonthlyStats();
     });
+  }
+
+
+// ✅ 초기 데이터 로드
+  Future<void> _loadInitialData() async {
+    try {
+      // 직원 목록 로드
+      await loadEmployees();
+
+      // 현재 월 스케줄 로드
+      await loadMonthlySchedules();
+
+      print('초기 데이터 로드 완료');
+    } catch (e) {
+      print('초기 데이터 로드 오류: $e');
+    }
   }
 
   /// 직원 목록 로드
@@ -197,6 +220,8 @@ class WorkplaceDetailController extends GetxController {
       final year = selectedDate.value.year;
       final month = selectedDate.value.month;
 
+      print('월별 스케줄 로드 시작: $year년 $month월');
+
       monthlySchedules.value = await _scheduleService.getMonthlySchedules(
         workplaceId: workplace.id,
         year: year,
@@ -205,11 +230,14 @@ class WorkplaceDetailController extends GetxController {
 
       print('월별 스케줄 로드 완료: ${monthlySchedules.length}개');
 
-      // 스케줄 로드 후 통계 계산
-      await calculateMonthlyStats();
+      // ✅ 스케줄 로드 후 즉시 통계 계산
+      if (monthlySchedules.isNotEmpty || employees.isNotEmpty) {
+        await calculateMonthlyStats();
+      }
     } catch (e) {
       print('월별 스케줄 로드 오류: $e');
       monthlySchedules.value = [];
+      monthlyStats.value = {}; // ✅ 에러 시에도 빈 상태로 초기화
     }
   }
 
