@@ -46,17 +46,17 @@
                     android:host="reset-password" />
             </intent-filter>
 
-            <!-- ✅ Supabase URL 스킴 (이메일 링크용) -->
-            <intent-filter android:autoVerify="true">
+            <!-- ✅ 이메일 인증 redirect_to -->
+            <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data
-                    android:scheme="https"
-                    android:host="iuzusurmnktpfqunfjsh.supabase.co"
-                    android:pathPrefix="/auth/v1/verify" />
+                    android:scheme="com.albamanage.albam"
+                    android:host="verify" />
             </intent-filter>
+
         </activity>
 
         <meta-data
