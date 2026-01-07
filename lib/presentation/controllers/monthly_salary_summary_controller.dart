@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/services/employee_service.dart';
 import '../../core/services/schedule_service.dart';
+import '../../core/utils/snackbar_helper.dart';
 import '../../data/models/workplace_model.dart';
 import '../../data/models/employee_model.dart';
 import '../../data/models/schedule_model.dart';
@@ -97,7 +98,7 @@ class MonthlySalarySummaryController extends GetxController {
       await _calculateStats(employees, schedules, previousMonthSchedules);
     } catch (e) {
       print('급여 로드 오류: $e');
-      Get.snackbar('오류', '급여 정보를 불러오는데 실패했습니다.');
+      SnackbarHelper.showError('급여 정보를 불러오는데 실패했습니다.');
     } finally {
       isLoading.value = false;
     }

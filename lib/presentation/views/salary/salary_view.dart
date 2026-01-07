@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../../app/routes/app_routes.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/snackbar_helper.dart';
 import '../../controllers/salary_controller.dart';
 import '../../../data/models/employee_model.dart';
 
@@ -127,13 +128,8 @@ class SalaryView extends GetView<SalaryController> {
 
                     if (result == true) {
                       // 페이지 새로고침을 위해 Get.back 후 다시 진입
-                      Get.snackbar(
-                        '알림',
+                      SnackbarHelper.showWarning(
                         '직원 정보가 수정되었습니다. 변경된 시급으로 다시 계산하려면 해당 월을 다시 조회해주세요.',
-                        snackPosition: SnackPosition.BOTTOM,
-                        backgroundColor: Colors.orange,
-                        colorText: Colors.white,
-                        duration: const Duration(seconds: 3),
                       );
                     }
                   },
@@ -163,14 +159,7 @@ class SalaryView extends GetView<SalaryController> {
                   GestureDetector(
                     onTap: () {
                       Clipboard.setData(ClipboardData(text: employee.accountNumber!));
-                      Get.snackbar(
-                        '복사완료',
-                        '계좌번호가 클립보드에 복사되었습니다.',
-                        snackPosition: SnackPosition.BOTTOM,
-                        duration: const Duration(seconds: 2),
-                        backgroundColor: Colors.green,
-                        colorText: Colors.white,
-                      );
+                      SnackbarHelper.showCopied('계좌번호가 클립보드에 복사되었습니다.');
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

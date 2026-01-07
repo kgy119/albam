@@ -59,7 +59,6 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
 
             await controller.loadEmployees();
 
-            // ✅ Get.snackbar → SnackbarHelper로 변경
             SnackbarHelper.showSuccess(
               '${result['employeeName']} 직원이 성공적으로 등록되었습니다.',
             );

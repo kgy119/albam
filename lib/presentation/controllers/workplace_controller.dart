@@ -26,7 +26,6 @@ class WorkplaceController extends GetxController {
       print('WorkplaceService 찾음');
     } catch (e) {
       print('WorkplaceService를 찾을 수 없음: $e');
-      Get.snackbar('오류', 'WorkplaceService 초기화 실패');
       return;
     }
 

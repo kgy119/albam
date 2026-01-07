@@ -355,7 +355,6 @@ class ScheduleSettingController extends GetxController {
       final deletedCount = existingSchedules.length;
       final addedCount = sourceSchedules.length;
 
-      // ✅ Get.snackbar 대신 SnackbarHelper 사용
       SnackbarHelper.showSuccess(
         '기존 스케줄 $deletedCount개 삭제 후\n${sourceDate.month}/${sourceDate.day}일 스케줄 $addedCount개가 복사되었습니다.',
       );
@@ -486,7 +485,7 @@ class ScheduleSettingController extends GetxController {
   /// 스케줄 수정 다이얼로그 표시
   void showEditScheduleDialog(Schedule schedule) {
     if (employees.isEmpty) {
-      Get.snackbar('알림', '등록된 직원이 없습니다.');
+      SnackbarHelper.showWarning('등록된 직원이 없습니다.');
       return;
     }
 
@@ -611,7 +610,7 @@ class ScheduleSettingController extends GetxController {
     final scheduleDates = await getScheduleDates();
 
     if (scheduleDates.isEmpty) {
-      Get.snackbar('알림', '복사할 수 있는 스케줄이 없습니다.');
+      SnackbarHelper.showWarning('복사할 수 있는 스케줄이 없습니다.');
       return;
     }
 

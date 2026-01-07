@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../../core/utils/snackbar_helper.dart';
 import '../../controllers/monthly_salary_summary_controller.dart';
 import '../../../app/routes/app_routes.dart';
 
@@ -425,14 +426,8 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
                       InkWell(
                         onTap: () {
                           Clipboard.setData(ClipboardData(text: employee.accountNumber!));
-                          Get.snackbar(
-                            '복사완료',
+                          SnackbarHelper.showCopied( // ✅ 수정
                             '${employee.name}님의 계좌번호가 복사되었습니다.',
-                            snackPosition: SnackPosition.BOTTOM,
-                            duration: const Duration(seconds: 2),
-                            backgroundColor: Colors.green,
-                            colorText: Colors.white,
-                            margin: const EdgeInsets.all(10),
                           );
                         },
                         borderRadius: BorderRadius.circular(4),

@@ -4,6 +4,7 @@ import '../../core/services/schedule_service.dart';
 import '../../data/models/employee_model.dart';
 import '../../data/models/schedule_model.dart';
 import '../../core/utils/salary_calculator.dart';
+import '../../core/utils/snackbar_helper.dart'; // ✅ 추가
 
 class SalaryController extends GetxController {
   final EmployeeService _employeeService = EmployeeService();
@@ -49,7 +50,7 @@ class SalaryController extends GetxController {
       final latestEmployee = await _employeeService.getEmployee(employee.id);
 
       if (latestEmployee == null) {
-        Get.snackbar('오류', '직원 정보를 찾을 수 없습니다.');
+        SnackbarHelper.showError('직원 정보를 찾을 수 없습니다.'); // ✅ 수정
         return;
       }
 
@@ -90,7 +91,7 @@ class SalaryController extends GetxController {
       print('급여 계산 완료');
     } catch (e) {
       print('급여 계산 오류: $e');
-      Get.snackbar('오류', '급여 계산 중 문제가 발생했습니다.');
+      SnackbarHelper.showError('급여 계산 중 문제가 발생했습니다.'); // ✅ 수정
     } finally {
       isLoading.value = false;
     }

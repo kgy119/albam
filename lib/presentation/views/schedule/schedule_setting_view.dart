@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../../core/utils/date_utils.dart' as date_utils;
+import '../../../core/utils/snackbar_helper.dart';
 import '../../../data/models/schedule_model.dart';
 import '../../controllers/schedule_setting_controller.dart';
 
@@ -502,7 +503,7 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
     final scheduleDates = await controller.getScheduleDates();
 
     if (scheduleDates.isEmpty) {
-      Get.snackbar('알림', '이번 달에 등록된 스케줄이 없습니다.');
+      SnackbarHelper.showWarning('이번 달에 등록된 스케줄이 없습니다.');
       return;
     }
 
@@ -511,7 +512,7 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
     scheduleDates.removeWhere((date) => date.isAtSameMomentAs(currentDate));
 
     if (scheduleDates.isEmpty) {
-      Get.snackbar('알림', '복사할 수 있는 다른 날짜의 스케줄이 없습니다.');
+      SnackbarHelper.showWarning('복사할 수 있는 다른 날짜의 스케줄이 없습니다.');
       return;
     }
 
