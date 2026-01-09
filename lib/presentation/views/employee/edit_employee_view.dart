@@ -36,6 +36,10 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
   bool _isLoading = false;
   bool _isImageUploading = false;
 
+  // ✅ Signed URL 저장
+  String? _displayImageUrl;
+  bool _isLoadingImageUrl = false;
+
   @override
   void initState() {
     super.initState();
@@ -46,7 +50,11 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
     _bankNameController = TextEditingController(text: employee.bankName ?? '');
     _accountNumberController = TextEditingController(text: employee.accountNumber ?? '');
 
-    // 최신 정보 가져오기
+    // ✅ 이미지 URL을 signed URL로 변환
+    if (employee.contractImageUrl != null) {
+      _convertToSignedUrl();
+    }
+
     _loadLatestEmployeeInfo();
   }
 
@@ -59,6 +67,37 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
     _accountNumberController.dispose();
     super.dispose();
   }
+
+  // ✅ Signed URL 변환
+  Future<void> _convertToSignedUrl() async {
+    if (employee.contractImageUrl == null) return;
+
+    setState(() {
+      _isLoadingImageUrl = true;
+    });
+
+    try {
+      final signedUrl = await _storageService.getSignedImageUrl(
+        employee.contractImageUrl!,
+      );
+
+      if (mounted) {
+        setState(() {
+          _displayImageUrl = signedUrl;
+          _isLoadingImageUrl = false;
+        });
+      }
+    } catch (e) {
+      print('Signed URL 변환 오류: $e');
+      if (mounted) {
+        setState(() {
+          _displayImageUrl = employee.contractImageUrl;
+          _isLoadingImageUrl = false;
+        });
+      }
+    }
+  }
+
 
   Future<void> _loadLatestEmployeeInfo() async {
     try {
@@ -80,9 +119,131 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
   }
 
   Future<void> _pickImage() async {
+    await _showImageSourceBottomSheet();
+  }
+
+  Future<void> _showImageSourceBottomSheet() async {
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 타이틀
+                const Text(
+                  '근로계약서 이미지',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // 카메라 버튼
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.camera_alt,
+                      color: Colors.blue[700],
+                      size: 24,
+                    ),
+                  ),
+                  title: const Text(
+                    '카메라로 촬영',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    '지금 바로 촬영하기',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await _pickImageFromSource(ImageSource.camera);
+                  },
+                ),
+
+                // 구분선
+                Divider(
+                  height: 1,
+                  indent: 16,
+                  endIndent: 16,
+                  color: Colors.grey[300],
+                ),
+
+                // 갤러리 버튼
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.photo_library,
+                      color: Colors.green[700],
+                      size: 24,
+                    ),
+                  ),
+                  title: const Text(
+                    '갤러리에서 선택',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    '저장된 사진 선택하기',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await _pickImageFromSource(ImageSource.gallery);
+                  },
+                ),
+
+                const SizedBox(height: 10),
+
+                // 취소 버튼
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      child: const Text('취소'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickImageFromSource(ImageSource source) async {
     try {
       final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery,
+        source: source,
         maxWidth: 1024,
         maxHeight: 1024,
         imageQuality: 80,
@@ -414,7 +575,7 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
                                   ),
                                 ),
                               ] else if (employee.contractImageUrl != null && !_isImageDeleted) ...[
-                                // 기존 이미지
+                                // ✅ 기존 이미지 (Signed URL 사용)
                                 Container(
                                   height: 200,
                                   width: double.infinity,
@@ -426,22 +587,66 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
                                     children: [
                                       ClipRRect(
                                         borderRadius: BorderRadius.circular(8),
-                                        child: Image.network(
-                                          employee.contractImageUrl!,
+                                        child: _isLoadingImageUrl
+                                            ? const Center(
+                                          child: CircularProgressIndicator(),
+                                        )
+                                            : _displayImageUrl != null
+                                            ? Image.network(
+                                          _displayImageUrl!,
                                           fit: BoxFit.cover,
                                           width: double.infinity,
+                                          loadingBuilder: (context, child, loadingProgress) {
+                                            if (loadingProgress == null) return child;
+                                            return Center(
+                                              child: CircularProgressIndicator(
+                                                value: loadingProgress.expectedTotalBytes != null
+                                                    ? loadingProgress.cumulativeBytesLoaded /
+                                                    loadingProgress.expectedTotalBytes!
+                                                    : null,
+                                              ),
+                                            );
+                                          },
                                           errorBuilder: (context, error, stackTrace) {
-                                            return const Center(
+                                            print('이미지 로드 오류: $error');
+                                            return Container(
+                                              color: Colors.grey[100],
                                               child: Column(
                                                 mainAxisAlignment: MainAxisAlignment.center,
                                                 children: [
-                                                  Icon(Icons.error_outline, size: 48),
-                                                  SizedBox(height: 8),
-                                                  Text('이미지를 불러올 수 없습니다'),
+                                                  Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                                                  const SizedBox(height: 8),
+                                                  const Text(
+                                                    '이미지를 불러올 수 없습니다',
+                                                    style: TextStyle(color: Colors.red),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    '다시 업로드해주세요',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 12),
+                                                  ElevatedButton.icon(
+                                                    onPressed: _pickImage,
+                                                    icon: const Icon(Icons.refresh, size: 16),
+                                                    label: const Text('다시 선택'),
+                                                    style: ElevatedButton.styleFrom(
+                                                      padding: const EdgeInsets.symmetric(
+                                                        horizontal: 16,
+                                                        vertical: 8,
+                                                      ),
+                                                    ),
+                                                  ),
                                                 ],
                                               ),
                                             );
                                           },
+                                        )
+                                            : const Center(
+                                          child: CircularProgressIndicator(),
                                         ),
                                       ),
                                       Positioned(

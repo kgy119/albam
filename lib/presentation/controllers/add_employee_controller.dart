@@ -83,10 +83,10 @@ class AddEmployeeController extends GetxController {
   }
 
   /// 이미지 선택
-  Future<void> pickImage() async {
+  Future<void> pickImage({required ImageSource source}) async {
     try {
       final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery,
+        source: source,
         maxWidth: 1024,
         maxHeight: 1024,
         imageQuality: 80,
@@ -94,10 +94,48 @@ class AddEmployeeController extends GetxController {
 
       if (image != null) {
         selectedImage.value = File(image.path);
+        print('✅ 이미지 선택 완료: ${image.path}');
       }
     } catch (e) {
-      SnackbarHelper.showError('이미지를 선택할 수 없습니다.'); // 수정
+      print('❌ 이미지 선택 오류: $e');
+      SnackbarHelper.showError('이미지를 선택할 수 없습니다.');
     }
+  }
+
+  /// 이미지 선택 방법 다이얼로그 표시
+  void showImageSourceDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('근로계약서 이미지'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Colors.blue),
+              title: const Text('카메라로 촬영'),
+              onTap: () {
+                Get.back();
+                pickImage(source: ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Colors.green),
+              title: const Text('갤러리에서 선택'),
+              onTap: () {
+                Get.back();
+                pickImage(source: ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 이미지 Supabase Storage에 업로드

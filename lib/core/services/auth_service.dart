@@ -140,6 +140,9 @@ class AuthService extends GetxService {
         OAuthProvider.google,
         redirectTo: redirectUrl,
         authScreenLaunchMode: LaunchMode.externalApplication,
+        queryParams: {
+          'prompt': 'select_account',  // ✅ 추가: 항상 계정 선택 화면 표시
+        },
       );
 
       return {'success': true};

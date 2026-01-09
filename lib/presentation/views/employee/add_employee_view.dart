@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../controllers/add_employee_controller.dart';
@@ -306,7 +307,7 @@ class AddEmployeeView extends GetView<AddEmployeeController> {
 
   Widget _buildImagePicker() {
     return GestureDetector(
-      onTap: controller.pickImage,
+      onTap: () => _showImageSourceBottomSheet(), // ✅ context 제거
       child: Container(
         height: 120,
         width: double.infinity,
@@ -323,7 +324,7 @@ class AddEmployeeView extends GetView<AddEmployeeController> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.cloud_upload,
+              Icons.add_photo_alternate,
               size: 48,
               color: Colors.grey[400],
             ),
@@ -336,7 +337,7 @@ class AddEmployeeView extends GetView<AddEmployeeController> {
               ),
             ),
             Text(
-              '터치하여 갤러리에서 선택',
+              '터치하여 카메라 또는 갤러리 선택',
               style: TextStyle(
                 color: Colors.grey[500],
                 fontSize: 12,
@@ -345,6 +346,124 @@ class AddEmployeeView extends GetView<AddEmployeeController> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showImageSourceBottomSheet() { // ✅ context 파라미터 제거
+    showModalBottomSheet(
+      context: Get.context!, // ✅ Get.context 사용
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 타이틀
+                const Text(
+                  '근로계약서 이미지',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // 카메라 버튼
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.camera_alt,
+                      color: Colors.blue[700],
+                      size: 24,
+                    ),
+                  ),
+                  title: const Text(
+                    '카메라로 촬영',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    '지금 바로 촬영하기',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    controller.pickImage(source: ImageSource.camera);
+                  },
+                ),
+
+                // 구분선
+                Divider(
+                  height: 1,
+                  indent: 16,
+                  endIndent: 16,
+                  color: Colors.grey[300],
+                ),
+
+                // 갤러리 버튼
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.photo_library,
+                      color: Colors.green[700],
+                      size: 24,
+                    ),
+                  ),
+                  title: const Text(
+                    '갤러리에서 선택',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    '저장된 사진 선택하기',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    controller.pickImage(source: ImageSource.gallery);
+                  },
+                ),
+
+                const SizedBox(height: 10),
+
+                // 취소 버튼
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      child: const Text('취소'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
