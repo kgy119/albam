@@ -359,34 +359,8 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
                           if (schedule.memo != null && schedule.memo!.isNotEmpty) ...[
                             const SizedBox(width: 8),
                             GestureDetector(
-                              onTap: () {
-                                showDialog(
-                                  context: Get.context!,
-                                  builder: (BuildContext dialogContext) {
-                                    return AlertDialog(
-                                      content: Row(
-                                        children: [
-                                          Icon(Icons.note, color: Colors.blue[700], size: 20),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Text(
-                                              schedule.memo!,
-                                              style: const TextStyle(fontSize: 15),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.of(dialogContext).pop(),
-                                          child: const Text('닫기'),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-                              },
                               child: Tooltip(
+                                triggerMode: TooltipTriggerMode.tap, // ⭐ 탭으로 표시
                                 message: schedule.memo!,
                                 padding: const EdgeInsets.all(12),
                                 margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -399,7 +373,7 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
                                   fontSize: 13,
                                 ),
                                 preferBelow: false,
-                                waitDuration: const Duration(milliseconds: 500),
+                                waitDuration: Duration.zero, // 탭이므로 대기시간 제거
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
