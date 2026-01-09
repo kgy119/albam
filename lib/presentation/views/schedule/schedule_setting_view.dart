@@ -304,13 +304,13 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
                 // 직원 아바타
                 CircleAvatar(
                   backgroundColor: schedule.isSubstitute
-                      ? Colors.orange.withOpacity(0.1) // 대체근무시 다른 색상
+                      ? Colors.orange.withOpacity(0.1)
                       : Theme.of(Get.context!).primaryColor.withOpacity(0.1),
                   child: Text(
                     schedule.employeeName.isNotEmpty ? schedule.employeeName[0] : '?',
                     style: TextStyle(
                       color: schedule.isSubstitute
-                          ? Colors.orange[700] // 대체근무시 다른 색상
+                          ? Colors.orange[700]
                           : Theme.of(Get.context!).primaryColor,
                       fontWeight: FontWeight.bold,
                     ),
@@ -326,14 +326,17 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            schedule.employeeName,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                          Flexible(
+                            child: Text(
+                              schedule.employeeName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          // 대체근무 표시 추가
+                          // 대체근무 표시
                           if (schedule.isSubstitute) ...[
                             const SizedBox(width: 8),
                             Container(
@@ -352,37 +355,116 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
                               ),
                             ),
                           ],
+                          // 메모 표시
+                          if (schedule.memo != null && schedule.memo!.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () {
+                                showDialog(
+                                  context: Get.context!,
+                                  builder: (BuildContext dialogContext) {
+                                    return AlertDialog(
+                                      content: Row(
+                                        children: [
+                                          Icon(Icons.note, color: Colors.blue[700], size: 20),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              schedule.memo!,
+                                              style: const TextStyle(fontSize: 15),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(dialogContext).pop(),
+                                          child: const Text('닫기'),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                              child: Tooltip(
+                                message: schedule.memo!,
+                                padding: const EdgeInsets.all(12),
+                                margin: const EdgeInsets.symmetric(horizontal: 16),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[800],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                textStyle: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                ),
+                                preferBelow: false,
+                                waitDuration: const Duration(milliseconds: 500),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue[100],
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.blue[300]!),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.note,
+                                        size: 12,
+                                        color: Colors.blue[700],
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '메모',
+                                        style: TextStyle(
+                                          color: Colors.blue[700],
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
-                      Text(
-                        schedule.timeRangeString,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
+                      const SizedBox(height: 4), // ✅ 추가
+                      Row( // ✅ 시간 정보를 Row로 변경
+                        children: [
+                          Text(
+                            schedule.timeRangeString,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(width: 8), // ✅ 추가
+                          Container( // ✅ 근무시간을 여기로 이동
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: schedule.isSubstitute
+                                  ? Colors.orange.withOpacity(0.1)
+                                  : Theme.of(Get.context!).primaryColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              schedule.workTimeString,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: schedule.isSubstitute
+                                    ? Colors.orange[700]
+                                    : Theme.of(Get.context!).primaryColor,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ),
-
-                // 근무시간 정보
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: schedule.isSubstitute
-                        ? Colors.orange.withOpacity(0.1) // 대체근무시 다른 색상
-                        : Theme.of(Get.context!).primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    schedule.workTimeString,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: schedule.isSubstitute
-                          ? Colors.orange[700] // 대체근무시 다른 색상
-                          : Theme.of(Get.context!).primaryColor,
-                    ),
                   ),
                 ),
 
@@ -431,7 +513,6 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
       ),
     );
   }
-
 
   Widget _buildTimeBar(schedule) {
     // 전체 스케줄의 최소/최대 시간 계산

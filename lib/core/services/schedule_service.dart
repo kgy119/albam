@@ -75,6 +75,7 @@ class ScheduleService extends GetxService {
     required DateTime endTime,
     required int totalMinutes,
     bool isSubstitute = false,
+    String? memo,
   }) async {
     try {
       print('스케줄 추가 시작');
@@ -90,6 +91,7 @@ class ScheduleService extends GetxService {
         'end_time': endTime.toIso8601String(),
         'total_minutes': totalMinutes,
         'is_substitute': isSubstitute,
+        'memo': memo,
       })
           .select()
           .single();
@@ -112,6 +114,7 @@ class ScheduleService extends GetxService {
     required DateTime endTime,
     required int totalMinutes,
     bool isSubstitute = false,
+    String? memo,
   }) async {
     try {
       print('스케줄 수정 시작: $scheduleId');
@@ -125,6 +128,7 @@ class ScheduleService extends GetxService {
         'end_time': endTime.toIso8601String(),
         'total_minutes': totalMinutes,
         'is_substitute': isSubstitute,
+        'memo': memo,
       })
           .eq('id', scheduleId);
 

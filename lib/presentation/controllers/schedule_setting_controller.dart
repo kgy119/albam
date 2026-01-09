@@ -73,6 +73,7 @@ class ScheduleSettingController extends GetxController {
     required TimeOfDay startTime,
     required TimeOfDay endTime,
     bool isSubstitute = false,
+    String? memo,
   }) async {
     try {
       final employee = employees.firstWhere((e) => e.id == employeeId);
@@ -113,6 +114,7 @@ class ScheduleSettingController extends GetxController {
         endTime: actualEndDateTime,
         totalMinutes: totalMinutes,
         isSubstitute: isSubstitute,
+        memo: memo,
       );
 
       await loadSchedules();
@@ -142,6 +144,7 @@ class ScheduleSettingController extends GetxController {
     required TimeOfDay startTime,
     required TimeOfDay endTime,
     bool isSubstitute = false,
+    String? memo,
   }) async {
     try {
       final employee = employees.firstWhere((e) => e.id == employeeId);
@@ -181,6 +184,7 @@ class ScheduleSettingController extends GetxController {
         endTime: actualEndDateTime,
         totalMinutes: totalMinutes,
         isSubstitute: isSubstitute,
+        memo: memo,
       );
 
       await loadSchedules();
@@ -370,114 +374,19 @@ class ScheduleSettingController extends GetxController {
   /// 스케줄 추가 다이얼로그 표시
   void showAddScheduleDialog() {
     if (employees.isEmpty) {
-      SnackbarHelper.showWarning('등록된 직원이 없습니다.'); // 수정
+      SnackbarHelper.showWarning('등록된 직원이 없습니다.');
       return;
     }
-
-    String? selectedEmployeeId;
-    TimeOfDay? startTime;
-    TimeOfDay? endTime;
-    bool isSubstitute = false;
 
     showDialog(
       context: Get.context!,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text('${selectedDate.month}/${selectedDate.day} 스케줄 추가'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 직원 선택
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: '직원 선택',
-                      border: OutlineInputBorder(),
-                    ),
-                    value: selectedEmployeeId,
-                    items: employees
-                        .map((employee) => DropdownMenuItem(
-                      value: employee.id,
-                      child: Text(employee.name),
-                    ))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedEmployeeId = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // 시작 시간 선택
-                  ListTile(
-                    title: const Text('시작 시간'),
-                    subtitle: Text(startTime?.format(context) ?? '선택해주세요'),
-                    trailing: const Icon(Icons.access_time),
-                    onTap: () async {
-                      final time = await selectTime(context, initialTime: startTime);
-                      if (time != null) {
-                        setState(() {
-                          startTime = time;
-                        });
-                      }
-                    },
-                  ),
-
-                  // 종료 시간 선택
-                  ListTile(
-                    title: const Text('종료 시간'),
-                    subtitle: Text(endTime?.format(context) ?? '선택해주세요'),
-                    trailing: const Icon(Icons.access_time),
-                    onTap: () async {
-                      final time = await selectTime(context, initialTime: endTime);
-                      if (time != null) {
-                        setState(() {
-                          endTime = time;
-                        });
-                      }
-                    },
-                  ),
-
-                  // 대체근무 체크박스
-                  CheckboxListTile(
-                    title: const Text('대체근무'),
-                    subtitle: const Text('다른 직원 대신 근무하는 경우 체크'),
-                    value: isSubstitute,
-                    onChanged: (value) {
-                      setState(() {
-                        isSubstitute = value ?? false;
-                      });
-                    },
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('취소'),
-                ),
-                ElevatedButton(
-                  onPressed: selectedEmployeeId != null && startTime != null && endTime != null
-                      ? () async {
-                    Navigator.of(context).pop();
-                    await Future.delayed(const Duration(milliseconds: 200));
-                    await addSchedule(
-                      employeeId: selectedEmployeeId!,
-                      startTime: startTime!,
-                      endTime: endTime!,
-                      isSubstitute: isSubstitute,
-                    );
-                  }
-                      : null,
-                  child: const Text('추가'),
-                ),
-              ],
-            );
-          },
+        return _AddScheduleDialog(
+          employees: employees,
+          selectedDate: selectedDate,
+          onAdd: addSchedule,
+          onSelectTime: selectTime,
         );
       },
     );
@@ -490,117 +399,16 @@ class ScheduleSettingController extends GetxController {
       return;
     }
 
-    String? selectedEmployeeId = schedule.employeeId;
-    TimeOfDay? startTime = TimeOfDay(
-      hour: schedule.startTime.hour,
-      minute: schedule.startTime.minute,
-    );
-    TimeOfDay? endTime = TimeOfDay(
-      hour: schedule.endTime.hour,
-      minute: schedule.endTime.minute,
-    );
-    bool isSubstitute = schedule.isSubstitute;
-
     showDialog(
       context: Get.context!,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text('${selectedDate.month}/${selectedDate.day} 스케줄 수정'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 직원 선택
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: '직원 선택',
-                      border: OutlineInputBorder(),
-                    ),
-                    value: selectedEmployeeId,
-                    items: employees
-                        .map((employee) => DropdownMenuItem(
-                      value: employee.id,
-                      child: Text(employee.name),
-                    ))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedEmployeeId = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // 시작 시간 선택
-                  ListTile(
-                    title: const Text('시작 시간'),
-                    subtitle: Text(startTime?.format(context) ?? '선택해주세요'),
-                    trailing: const Icon(Icons.access_time),
-                    onTap: () async {
-                      final time = await selectTime(context, initialTime: startTime);
-                      if (time != null) {
-                        setState(() {
-                          startTime = time;
-                        });
-                      }
-                    },
-                  ),
-
-                  // 종료 시간 선택
-                  ListTile(
-                    title: const Text('종료 시간'),
-                    subtitle: Text(endTime?.format(context) ?? '선택해주세요'),
-                    trailing: const Icon(Icons.access_time),
-                    onTap: () async {
-                      final time = await selectTime(context, initialTime: endTime);
-                      if (time != null) {
-                        setState(() {
-                          endTime = time;
-                        });
-                      }
-                    },
-                  ),
-
-                  // 대체근무 체크박스
-                  CheckboxListTile(
-                    title: const Text('대체근무'),
-                    subtitle: const Text('다른 직원 대신 근무하는 경우 체크'),
-                    value: isSubstitute,
-                    onChanged: (value) {
-                      setState(() {
-                        isSubstitute = value ?? false;
-                      });
-                    },
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('취소'),
-                ),
-                ElevatedButton(
-                  onPressed: selectedEmployeeId != null && startTime != null && endTime != null
-                      ? () async {
-                    Navigator.of(context).pop();
-                    await Future.delayed(const Duration(milliseconds: 200));
-                    await updateSchedule(
-                      scheduleId: schedule.id,
-                      employeeId: selectedEmployeeId!,
-                      startTime: startTime!,
-                      endTime: endTime!,
-                      isSubstitute: isSubstitute,
-                    );
-                  }
-                      : null,
-                  child: const Text('수정'),
-                ),
-              ],
-            );
-          },
+        return _EditScheduleDialog(
+          employees: employees,
+          selectedDate: selectedDate,
+          schedule: schedule,
+          onUpdate: updateSchedule,
+          onSelectTime: selectTime,
         );
       },
     );
@@ -1031,6 +839,340 @@ class ScheduleSettingController extends GetxController {
 
   Widget _buildApplyDialog() {
     return ApplyToOtherDatesDialog(controller: this);
+  }
+}
+
+// ============================================================================
+// 스케줄 추가 다이얼로그 위젯
+// ============================================================================
+class _AddScheduleDialog extends StatefulWidget {
+  final RxList<Employee> employees;
+  final DateTime selectedDate;
+  final Function({
+  required String employeeId,
+  required TimeOfDay startTime,
+  required TimeOfDay endTime,
+  bool isSubstitute,
+  String? memo,
+  }) onAdd;
+  final Future<TimeOfDay?> Function(BuildContext, {TimeOfDay? initialTime}) onSelectTime;
+
+  const _AddScheduleDialog({
+    required this.employees,
+    required this.selectedDate,
+    required this.onAdd,
+    required this.onSelectTime,
+  });
+
+  @override
+  State<_AddScheduleDialog> createState() => _AddScheduleDialogState();
+}
+
+class _AddScheduleDialogState extends State<_AddScheduleDialog> {
+  String? selectedEmployeeId;
+  TimeOfDay? startTime;
+  TimeOfDay? endTime;
+  bool isSubstitute = false;
+  late TextEditingController memoController;
+
+  @override
+  void initState() {
+    super.initState();
+    memoController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    memoController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('${widget.selectedDate.month}/${widget.selectedDate.day} 스케줄 추가'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 직원 선택
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: '직원 선택',
+                border: OutlineInputBorder(),
+              ),
+              value: selectedEmployeeId,
+              items: widget.employees
+                  .map((employee) => DropdownMenuItem(
+                value: employee.id,
+                child: Text(employee.name),
+              ))
+                  .toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedEmployeeId = value;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // 시작 시간 선택
+            ListTile(
+              title: const Text('시작 시간'),
+              subtitle: Text(startTime?.format(context) ?? '선택해주세요'),
+              trailing: const Icon(Icons.access_time),
+              onTap: () async {
+                final time = await widget.onSelectTime(context, initialTime: startTime);
+                if (time != null) {
+                  setState(() {
+                    startTime = time;
+                  });
+                }
+              },
+            ),
+
+            // 종료 시간 선택
+            ListTile(
+              title: const Text('종료 시간'),
+              subtitle: Text(endTime?.format(context) ?? '선택해주세요'),
+              trailing: const Icon(Icons.access_time),
+              onTap: () async {
+                final time = await widget.onSelectTime(context, initialTime: endTime);
+                if (time != null) {
+                  setState(() {
+                    endTime = time;
+                  });
+                }
+              },
+            ),
+
+            // 대체근무 체크박스
+            CheckboxListTile(
+              title: const Text('대체근무'),
+              subtitle: const Text('다른 직원 대신 근무하는 경우 체크'),
+              value: isSubstitute,
+              onChanged: (value) {
+                setState(() {
+                  isSubstitute = value ?? false;
+                });
+              },
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+
+            // 메모 입력
+            const SizedBox(height: 8),
+            TextField(
+              controller: memoController,
+              decoration: const InputDecoration(
+                labelText: '메모 (선택)',
+                hintText: '특이사항 입력',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.note),
+              ),
+              maxLines: 1,
+              textInputAction: TextInputAction.done,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('취소'),
+        ),
+        ElevatedButton(
+          onPressed: selectedEmployeeId != null && startTime != null && endTime != null
+              ? () async {
+            final memo = memoController.text.trim();
+            Navigator.of(context).pop();
+            await Future.delayed(const Duration(milliseconds: 200));
+            await widget.onAdd(
+              employeeId: selectedEmployeeId!,
+              startTime: startTime!,
+              endTime: endTime!,
+              isSubstitute: isSubstitute,
+              memo: memo.isEmpty ? null : memo,
+            );
+          }
+              : null,
+          child: const Text('추가'),
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================================
+// 스케줄 수정 다이얼로그 위젯
+// ============================================================================
+class _EditScheduleDialog extends StatefulWidget {
+  final RxList<Employee> employees;
+  final DateTime selectedDate;
+  final Schedule schedule;
+  final Function({
+  required String scheduleId,
+  required String employeeId,
+  required TimeOfDay startTime,
+  required TimeOfDay endTime,
+  bool isSubstitute,
+  String? memo,
+  }) onUpdate;
+  final Future<TimeOfDay?> Function(BuildContext, {TimeOfDay? initialTime}) onSelectTime;
+
+  const _EditScheduleDialog({
+    required this.employees,
+    required this.selectedDate,
+    required this.schedule,
+    required this.onUpdate,
+    required this.onSelectTime,
+  });
+
+  @override
+  State<_EditScheduleDialog> createState() => _EditScheduleDialogState();
+}
+
+class _EditScheduleDialogState extends State<_EditScheduleDialog> {
+  late String? selectedEmployeeId;
+  late TimeOfDay? startTime;
+  late TimeOfDay? endTime;
+  late bool isSubstitute;
+  late TextEditingController memoController;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedEmployeeId = widget.schedule.employeeId;
+    startTime = TimeOfDay(
+      hour: widget.schedule.startTime.hour,
+      minute: widget.schedule.startTime.minute,
+    );
+    endTime = TimeOfDay(
+      hour: widget.schedule.endTime.hour,
+      minute: widget.schedule.endTime.minute,
+    );
+    isSubstitute = widget.schedule.isSubstitute;
+    memoController = TextEditingController(text: widget.schedule.memo ?? '');
+  }
+
+  @override
+  void dispose() {
+    memoController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('${widget.selectedDate.month}/${widget.selectedDate.day} 스케줄 수정'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 직원 선택
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: '직원 선택',
+                border: OutlineInputBorder(),
+              ),
+              value: selectedEmployeeId,
+              items: widget.employees
+                  .map((employee) => DropdownMenuItem(
+                value: employee.id,
+                child: Text(employee.name),
+              ))
+                  .toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedEmployeeId = value;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // 시작 시간 선택
+            ListTile(
+              title: const Text('시작 시간'),
+              subtitle: Text(startTime?.format(context) ?? '선택해주세요'),
+              trailing: const Icon(Icons.access_time),
+              onTap: () async {
+                final time = await widget.onSelectTime(context, initialTime: startTime);
+                if (time != null) {
+                  setState(() {
+                    startTime = time;
+                  });
+                }
+              },
+            ),
+
+            // 종료 시간 선택
+            ListTile(
+              title: const Text('종료 시간'),
+              subtitle: Text(endTime?.format(context) ?? '선택해주세요'),
+              trailing: const Icon(Icons.access_time),
+              onTap: () async {
+                final time = await widget.onSelectTime(context, initialTime: endTime);
+                if (time != null) {
+                  setState(() {
+                    endTime = time;
+                  });
+                }
+              },
+            ),
+
+            // 대체근무 체크박스
+            CheckboxListTile(
+              title: const Text('대체근무'),
+              subtitle: const Text('다른 직원 대신 근무하는 경우 체크'),
+              value: isSubstitute,
+              onChanged: (value) {
+                setState(() {
+                  isSubstitute = value ?? false;
+                });
+              },
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+
+            // 메모 입력
+            const SizedBox(height: 8),
+            TextField(
+              controller: memoController,
+              decoration: const InputDecoration(
+                labelText: '메모 (선택)',
+                hintText: '특이사항 입력',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.note),
+              ),
+              maxLines: 1,
+              textInputAction: TextInputAction.done,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('취소'),
+        ),
+        ElevatedButton(
+          onPressed: selectedEmployeeId != null && startTime != null && endTime != null
+              ? () async {
+            final memo = memoController.text.trim();
+            Navigator.of(context).pop();
+            await Future.delayed(const Duration(milliseconds: 200));
+            await widget.onUpdate(
+              scheduleId: widget.schedule.id,
+              employeeId: selectedEmployeeId!,
+              startTime: startTime!,
+              endTime: endTime!,
+              isSubstitute: isSubstitute,
+              memo: memo.isEmpty ? null : memo,
+            );
+          }
+              : null,
+          child: const Text('수정'),
+        ),
+      ],
+    );
   }
 }
 

@@ -8,6 +8,7 @@ class Schedule {
   final DateTime endTime;
   final int totalMinutes;
   final bool isSubstitute;
+  final String? memo;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -21,6 +22,7 @@ class Schedule {
     required this.endTime,
     required this.totalMinutes,
     this.isSubstitute = false,
+    this.memo,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -43,6 +45,7 @@ class Schedule {
           : DateTime.now(),
       totalMinutes: json['total_minutes'] as int? ?? 0,
       isSubstitute: json['is_substitute'] as bool? ?? false,
+      memo: json['memo'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
@@ -80,6 +83,7 @@ class Schedule {
       'end_time': endTime.toIso8601String(),
       'total_minutes': totalMinutes,
       'is_substitute': isSubstitute,
+      'memo': memo,
       // created_at, updated_at은 DB에서 자동 생성
     };
   }
@@ -93,6 +97,7 @@ class Schedule {
       'end_time': endTime.toIso8601String(),
       'total_minutes': totalMinutes,
       'is_substitute': isSubstitute,
+      'memo': memo,
       // updated_at은 트리거에서 자동 업데이트
     };
   }

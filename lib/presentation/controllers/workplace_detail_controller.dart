@@ -435,6 +435,7 @@ class WorkplaceDetailController extends GetxController {
     required DateTime endTime,
     required int totalMinutes,
     required bool isSubstitute,
+    String? memo,
   }) async {
     try {
       await _scheduleService.updateSchedule(
@@ -445,6 +446,7 @@ class WorkplaceDetailController extends GetxController {
         endTime: endTime,
         totalMinutes: totalMinutes,
         isSubstitute: isSubstitute,
+        memo: memo,
       );
 
       // 스케줄 목록 새로고침
