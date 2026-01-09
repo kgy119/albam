@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../../app/theme/app_theme.dart';
+import '../../../core/services/schedule_service.dart';
+import '../../../core/utils/snackbar_helper.dart';
 import '../../controllers/workplace_detail_controller.dart';
 import '../../../app/routes/app_routes.dart';
 
@@ -14,15 +16,17 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
       appBar: AppBar(
         title: Text(controller.workplace.name),
         actions: [
+          // 직원 관리 아이콘 변경
           IconButton(
-            icon: const Icon(Icons.people),
+            icon: const Icon(Icons.people_alt_outlined),  // 수정: people -> group_outlined
             onPressed: () {
               Get.toNamed(AppRoutes.employeeList, arguments: controller.workplace);
             },
             tooltip: '직원 관리',
           ),
+          // 급여 요약 아이콘 변경
           IconButton(
-            icon: const Icon(Icons.receipt_long),
+            icon: const Icon(Icons.receipt_long),  // 수정: receipt_long -> account_balance_wallet_outlined
             onPressed: () {
               Get.toNamed(
                 AppRoutes.monthlySalarySummary,
@@ -50,6 +54,9 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
                   children: [
                     // 달력
                     _buildCalendarSection(),
+
+                  // 오늘 스케줄 섹션 (추가)
+                  _buildTodayScheduleSection(),
 
                     // 월별 통계 카드
                     _buildMonthlyStatsCard(),
@@ -203,6 +210,649 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
         ],
       ),
     );
+  }
+
+  /// 오늘 스케줄 섹션
+  Widget _buildTodayScheduleSection() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selectedMonth = DateTime(
+      controller.selectedDate.value.year,
+      controller.selectedDate.value.month,
+      1,
+    );
+
+    // 선택된 월이 이번 달인지 확인
+    if (selectedMonth.year != today.year || selectedMonth.month != today.month) {
+      return const SizedBox.shrink();
+    }
+
+    return Obx(() {
+      final todaySchedules = controller.getDaySchedules(now.day);
+
+      if (todaySchedules.isEmpty) {
+        return const SizedBox.shrink();
+      }
+
+      final currentTime = TimeOfDay.now();
+      final currentMinutes = currentTime.hour * 60 + currentTime.minute;
+
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.today, size: 14, color: Colors.white),
+                      const SizedBox(width: 4),
+                      Text(
+                        '오늘 ${now.day}일',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '스케줄 ${todaySchedules.length}개',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // 스케줄 리스트
+            ...todaySchedules.asMap().entries.map((entry) {
+              final schedule = entry.value;
+
+              // 현재 근무 중인지 확인
+              final startMinutes = schedule.startTime.hour * 60 + schedule.startTime.minute;
+              final endMinutes = schedule.endTime.hour * 60 + schedule.endTime.minute;
+              final isWorkingNow = currentMinutes >= startMinutes && currentMinutes < endMinutes;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildTodayScheduleCard(schedule, isWorkingNow),
+              );
+            }),
+          ],
+        ),
+      );
+    });
+  }
+
+  /// 오늘 스케줄 카드
+  Widget _buildTodayScheduleCard(schedule, bool isWorkingNow) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isWorkingNow
+              ? AppTheme.primaryColor
+              : Colors.grey[300]!,
+          width: isWorkingNow ? 2.5 : 1,
+        ),
+        boxShadow: isWorkingNow
+            ? [
+          BoxShadow(
+            color: AppTheme.primaryColor.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ]
+            : [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(  // 수정: Row -> Column
+          children: [
+            Row(
+              children: [
+                // 직원 아바타
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: schedule.isSubstitute
+                      ? Colors.orange.withOpacity(0.1)
+                      : AppTheme.primaryColor.withOpacity(0.1),
+                  child: Text(
+                    schedule.employeeName.isNotEmpty ? schedule.employeeName[0] : '?',
+                    style: TextStyle(
+                      color: schedule.isSubstitute
+                          ? Colors.orange[700]
+                          : AppTheme.primaryColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // 직원 정보
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            schedule.employeeName,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: isWorkingNow
+                                  ? AppTheme.primaryColor
+                                  : Colors.black87,
+                            ),
+                          ),
+                          if (schedule.isSubstitute) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                '대체',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (isWorkingNow) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                '근무중',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        schedule.timeRangeString,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isWorkingNow
+                              ? AppTheme.primaryColor
+                              : Colors.grey[600],
+                          fontWeight: isWorkingNow
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 근무시간
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: schedule.isSubstitute
+                        ? Colors.orange.withOpacity(0.1)
+                        : (isWorkingNow
+                        ? AppTheme.primaryColor.withOpacity(0.15)
+                        : AppTheme.primaryColor.withOpacity(0.08)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    schedule.workTimeString,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: schedule.isSubstitute
+                          ? Colors.orange[700]
+                          : AppTheme.primaryColor,
+                    ),
+                  ),
+                ),
+
+                // 메뉴 버튼
+                const SizedBox(width: 4),
+                PopupMenuButton<String>(
+                  icon: Icon(
+                    Icons.more_vert,
+                    size: 20,
+                    color: isWorkingNow ? AppTheme.primaryColor : Colors.grey[600],
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      _showEditScheduleDialog(schedule);
+                    } else if (value == 'delete') {
+                      _showDeleteScheduleDialog(schedule);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 18),
+                          SizedBox(width: 10),
+                          Text('수정'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 18, color: Colors.red),
+                          SizedBox(width: 10),
+                          Text('삭제', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            // 시간 바 추가
+            const SizedBox(height: 12),
+            _buildTodayTimeBar(schedule),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 오늘 스케줄 시간 바 (추가)
+  Widget _buildTodayTimeBar(schedule) {
+    final now = DateTime.now();
+    final todaySchedules = controller.getDaySchedules(now.day);
+
+    // 오늘의 모든 스케줄에서 최소/최대 시간 계산
+    double minHour = 24.0;
+    double maxHour = 0.0;
+
+    for (var s in todaySchedules) {
+      final startHour = s.startTime.hour + (s.startTime.minute / 60.0);
+      final endHour = s.endTime.hour + (s.endTime.minute / 60.0);
+
+      if (startHour < minHour) minHour = startHour;
+      if (endHour > maxHour) maxHour = endHour;
+    }
+
+    // 현재 스케줄의 시간
+    final startHour = schedule.startTime.hour + (schedule.startTime.minute / 60.0);
+    final endHour = schedule.endTime.hour + (schedule.endTime.minute / 60.0);
+
+    // 전체 범위 대비 비율 계산
+    final totalRange = maxHour - minHour;
+    final startRatio = totalRange > 0 ? (startHour - minHour) / totalRange : 0;
+    final duration = totalRange > 0 ? (endHour - startHour) / totalRange : 0;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+
+        return Container(
+          height: 8,
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                left: maxWidth * startRatio,
+                child: Container(
+                  width: maxWidth * duration,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: schedule.isSubstitute
+                        ? Colors.orange
+                        : AppTheme.primaryColor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// 스케줄 설정 화면으로 이동
+  void _navigateToScheduleSetting(DateTime date) async {
+    await Get.toNamed(
+      AppRoutes.scheduleSetting,
+      arguments: {
+        'workplace': controller.workplace,
+        'date': date,
+      },
+    );
+    controller.loadMonthlySchedules();
+  }
+
+  /// 스케줄 삭제 다이얼로그
+  void _showDeleteScheduleDialog(schedule) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('스케줄 삭제'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('다음 스케줄을 삭제하시겠습니까?'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '직원: ${schedule.employeeName}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text('시간: ${schedule.timeRangeString}'),
+                  Text('근무: ${schedule.workTimeString}'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '이 작업은 되돌릴 수 없습니다.',
+              style: TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Get.back();
+              await _deleteSchedule(schedule.id);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 스케줄 삭제 실행
+  Future<void> _deleteSchedule(String scheduleId) async {
+    try {
+      // controller의 메서드 사용 (수정됨)
+      await controller.deleteScheduleFromDetail(scheduleId);
+
+      SnackbarHelper.showSuccess('스케줄이 삭제되었습니다.');
+    } catch (e) {
+      print('스케줄 삭제 오류: $e');
+      SnackbarHelper.showError('스케줄 삭제에 실패했습니다.');
+    }
+  }
+
+  /// 스케줄 수정 다이얼로그
+  void _showEditScheduleDialog(schedule) async {
+    // 직원 목록 로드
+    if (controller.employees.isEmpty) {
+      await controller.loadEmployees();
+    }
+
+    if (controller.employees.isEmpty) {
+      SnackbarHelper.showWarning('등록된 직원이 없습니다.');
+      return;
+    }
+
+    String? selectedEmployeeId = schedule.employeeId;
+    TimeOfDay? startTime = TimeOfDay(
+      hour: schedule.startTime.hour,
+      minute: schedule.startTime.minute,
+    );
+    TimeOfDay? endTime = TimeOfDay(
+      hour: schedule.endTime.hour,
+      minute: schedule.endTime.minute,
+    );
+    bool isSubstitute = schedule.isSubstitute;
+
+    Get.dialog(
+      AlertDialog(
+        title: Text('${schedule.date.month}/${schedule.date.day}일 스케줄 수정'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 직원 선택
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: '직원 선택',
+                      border: OutlineInputBorder(),
+                    ),
+                    value: selectedEmployeeId,
+                    items: controller.employees
+                        .map((employee) => DropdownMenuItem(
+                      value: employee.id,
+                      child: Text(employee.name),
+                    ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedEmployeeId = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 시작 시간 선택
+                  ListTile(
+                    title: const Text('시작 시간'),
+                    subtitle: Text(startTime?.format(context) ?? '선택해주세요'),
+                    trailing: const Icon(Icons.access_time),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    onTap: () async {
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: startTime ?? TimeOfDay.now(),
+                        builder: (context, child) {
+                          return MediaQuery(
+                            data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+                            child: child!,
+                          );
+                        },
+                      );
+                      if (time != null) {
+                        setState(() {
+                          startTime = time;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 종료 시간 선택
+                  ListTile(
+                    title: const Text('종료 시간'),
+                    subtitle: Text(endTime?.format(context) ?? '선택해주세요'),
+                    trailing: const Icon(Icons.access_time),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    onTap: () async {
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: endTime ?? TimeOfDay.now(),
+                        builder: (context, child) {
+                          return MediaQuery(
+                            data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+                            child: child!,
+                          );
+                        },
+                      );
+                      if (time != null) {
+                        setState(() {
+                          endTime = time;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 대체근무 체크박스
+                  CheckboxListTile(
+                    title: const Text('대체근무'),
+                    subtitle: const Text('다른 직원 대신 근무하는 경우 체크'),
+                    value: isSubstitute,
+                    onChanged: (value) {
+                      setState(() {
+                        isSubstitute = value ?? false;
+                      });
+                    },
+                    controlAffinity: ListTileControlAffinity.leading,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: Colors.grey[300]!),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: selectedEmployeeId != null && startTime != null && endTime != null
+                ? () async {
+              Get.back();
+              await _updateSchedule(
+                schedule: schedule,
+                employeeId: selectedEmployeeId!,
+                startTime: startTime!,
+                endTime: endTime!,
+                isSubstitute: isSubstitute,
+              );
+            }
+                : null,
+            child: const Text('수정'),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
+  }
+
+  /// 스케줄 수정 실행
+  Future<void> _updateSchedule({
+    required schedule,
+    required String employeeId,
+    required TimeOfDay startTime,
+    required TimeOfDay endTime,
+    required bool isSubstitute,
+  }) async {
+    try {
+      final employee = controller.employees.firstWhere((e) => e.id == employeeId);
+
+      final startDateTime = DateTime(
+        schedule.date.year,
+        schedule.date.month,
+        schedule.date.day,
+        startTime.hour,
+        startTime.minute,
+      );
+
+      final endDateTime = DateTime(
+        schedule.date.year,
+        schedule.date.month,
+        schedule.date.day,
+        endTime.hour,
+        endTime.minute,
+      );
+
+      final actualEndDateTime = endDateTime.isBefore(startDateTime)
+          ? endDateTime.add(const Duration(days: 1))
+          : endDateTime;
+
+      final totalMinutes = actualEndDateTime.difference(startDateTime).inMinutes;
+
+      if (totalMinutes <= 0) {
+        SnackbarHelper.showWarning('종료시간이 시작시간보다 늦어야 합니다.');
+        return;
+      }
+
+      // controller의 _scheduleService 사용 (수정됨)
+      await controller.updateScheduleFromDetail(
+        scheduleId: schedule.id,
+        employeeId: employeeId,
+        employeeName: employee.name,
+        startTime: startDateTime,
+        endTime: actualEndDateTime,
+        totalMinutes: totalMinutes,
+        isSubstitute: isSubstitute,
+      );
+
+      SnackbarHelper.showSuccess('스케줄이 수정되었습니다.');
+    } catch (e) {
+      print('스케줄 수정 오류: $e');
+      SnackbarHelper.showError('스케줄 수정에 실패했습니다.');
+    }
   }
 
   Widget _buildCalendarDay(int day) {

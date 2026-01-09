@@ -425,4 +425,46 @@ class WorkplaceDetailController extends GetxController {
       return null;
     }
   }
+
+  /// 스케줄 수정 (Detail View에서 호출)
+  Future<void> updateScheduleFromDetail({
+    required String scheduleId,
+    required String employeeId,
+    required String employeeName,
+    required DateTime startTime,
+    required DateTime endTime,
+    required int totalMinutes,
+    required bool isSubstitute,
+  }) async {
+    try {
+      await _scheduleService.updateSchedule(
+        scheduleId: scheduleId,
+        employeeId: employeeId,
+        employeeName: employeeName,
+        startTime: startTime,
+        endTime: endTime,
+        totalMinutes: totalMinutes,
+        isSubstitute: isSubstitute,
+      );
+
+      // 스케줄 목록 새로고침
+      await loadMonthlySchedules();
+    } catch (e) {
+      print('스케줄 수정 오류: $e');
+      rethrow;
+    }
+  }
+
+  /// 스케줄 삭제 (Detail View에서 호출)
+  Future<void> deleteScheduleFromDetail(String scheduleId) async {
+    try {
+      await _scheduleService.deleteSchedule(scheduleId);
+
+      // 스케줄 목록 새로고침
+      await loadMonthlySchedules();
+    } catch (e) {
+      print('스케줄 삭제 오류: $e');
+      rethrow;
+    }
+  }
 }

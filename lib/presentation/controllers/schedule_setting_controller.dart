@@ -7,6 +7,7 @@ import '../../core/utils/snackbar_helper.dart';
 import '../../data/models/workplace_model.dart';
 import '../../data/models/employee_model.dart';
 import '../../data/models/schedule_model.dart';
+import '../views/schedule/schedule_setting_view.dart';
 
 class ScheduleSettingController extends GetxController {
   final EmployeeService _employeeService = EmployeeService();
@@ -919,4 +920,117 @@ class ScheduleSettingController extends GetxController {
       isSaving.value = false;
     }
   }
+
+  /// 선택된 날짜들에 스케줄 복사
+  Future<void> copySchedulesToMultipleDates(List<DateTime> targetDates) async {
+    if (targetDates.isEmpty) {
+      SnackbarHelper.showWarning('날짜를 선택해주세요.');
+      return;
+    }
+
+    if (schedules.isEmpty) {
+      SnackbarHelper.showWarning('복사할 스케줄이 없습니다.');
+      return;
+    }
+
+    try {
+      isSaving.value = true;
+
+      int successCount = 0;
+      int skipCount = 0;
+
+      for (var targetDate in targetDates) {
+        // 현재 날짜는 건너뛰기
+        final currentDate = DateTime(
+          selectedDate.year,
+          selectedDate.month,
+          selectedDate.day,
+        );
+
+        if (targetDate.isAtSameMomentAs(currentDate)) {
+          skipCount++;
+          continue;
+        }
+
+        // 대상 날짜의 기존 스케줄 삭제
+        final existingSchedules = await _scheduleService.getDaySchedules(
+          workplaceId: workplace.id,
+          date: targetDate,
+        );
+
+        if (existingSchedules.isNotEmpty) {
+          final scheduleIds = existingSchedules.map((s) => s.id).toList();
+          await _scheduleService.deleteSchedules(scheduleIds);
+        }
+
+        // 새로운 스케줄 추가
+        for (var sourceSchedule in schedules) {
+          final newStartTime = DateTime(
+            targetDate.year,
+            targetDate.month,
+            targetDate.day,
+            sourceSchedule.startTime.hour,
+            sourceSchedule.startTime.minute,
+          );
+
+          final newEndTime = DateTime(
+            targetDate.year,
+            targetDate.month,
+            targetDate.day,
+            sourceSchedule.endTime.hour,
+            sourceSchedule.endTime.minute,
+          );
+
+          final actualEndTime = newEndTime.isBefore(newStartTime)
+              ? newEndTime.add(const Duration(days: 1))
+              : newEndTime;
+
+          await _scheduleService.addSchedule(
+            workplaceId: workplace.id,
+            employeeId: sourceSchedule.employeeId,
+            employeeName: sourceSchedule.employeeName,
+            date: targetDate,
+            startTime: newStartTime,
+            endTime: actualEndTime,
+            totalMinutes: sourceSchedule.totalMinutes,
+            isSubstitute: sourceSchedule.isSubstitute,
+          );
+        }
+
+        successCount++;
+      }
+
+      if (successCount > 0) {
+        SnackbarHelper.showSuccess(
+          '${successCount}개 날짜에 스케줄 ${schedules.length}개가 복사되었습니다.',
+        );
+      } else if (skipCount > 0) {
+        SnackbarHelper.showInfo('현재 날짜는 복사에서 제외되었습니다.');
+      }
+    } catch (e) {
+      print('스케줄 복사 오류: $e');
+      SnackbarHelper.showError('스케줄 복사에 실패했습니다.');
+    } finally {
+      isSaving.value = false;
+    }
+  }
+
+  /// 다른 날 적용 다이얼로그 표시
+  void showApplyToOtherDatesDialog() {
+    if (schedules.isEmpty) {
+      SnackbarHelper.showWarning('복사할 스케줄이 없습니다.');
+      return;
+    }
+
+    // Get.find로 view에서 직접 호출하도록 변경
+    Get.dialog(
+      _buildApplyDialog(),
+      barrierDismissible: false,
+    );
+  }
+
+  Widget _buildApplyDialog() {
+    return ApplyToOtherDatesDialog(controller: this);
+  }
 }
+

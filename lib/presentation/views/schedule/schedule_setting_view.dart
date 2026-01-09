@@ -39,7 +39,7 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
         actions: [
           // 총 근무시간
           Obx(() => Padding(
-            padding: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.only(right: 16),
             child: Center(
               child: Text(
                 '총 ${controller.getTotalWorkTime()}',
@@ -50,55 +50,29 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
               ),
             ),
           )),
+        ],
+      ),
+      body: Column(
+        children: [
+          // 액션 탭 바 (추가)
+          _buildActionTabBar(),
 
-          // 메뉴 버튼
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            tooltip: '메뉴',
-            onSelected: (value) {
-              if (value == 'copy') {
-                controller.showCopyScheduleDialog();
-              } else if (value == 'delete_all') {
-                _showDeleteAllDialog();
+          // 스케줄 리스트
+          Expanded(
+            child: Obx(() {
+              if (controller.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
               }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'copy',
-                child: Row(
-                  children: [
-                    Icon(Icons.copy, size: 20),
-                    SizedBox(width: 12),
-                    Text('다른 날 복사'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'delete_all',
-                enabled: controller.schedules.isNotEmpty,
-                child: const Row(
-                  children: [
-                    Icon(Icons.delete_sweep, size: 20, color: Colors.red),
-                    SizedBox(width: 12),
-                    Text('전체 삭제', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
+
+              if (controller.schedules.isEmpty) {
+                return _buildEmptyState();
+              }
+
+              return _buildScheduleList();
+            }),
           ),
         ],
       ),
-      body: Obx(() {
-        if (controller.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (controller.schedules.isEmpty) {
-          return _buildEmptyState();
-        }
-
-        return _buildScheduleList();
-      }),
       floatingActionButton: Obx(() => FloatingActionButton(
         onPressed: controller.isSaving.value
             ? null
@@ -117,9 +91,109 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
     );
   }
 
+  /// 액션 탭 바 (추가)
+  Widget _buildActionTabBar() {
+    return Obx(() {
+      if (controller.schedules.isEmpty) {
+        return const SizedBox.shrink();
+      }
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            bottom: BorderSide(color: Colors.grey[200]!, width: 1),
+          ),
+        ),
+        child: Row(
+          children: [
+            // 다른 날 적용
+            Expanded(
+              child: _buildActionButton(
+                icon: Icons.event_available_outlined,
+                label: '다른 날 적용',
+                color: Theme.of(Get.context!).primaryColor,
+                onTap: controller.showApplyToOtherDatesDialog,
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // 다른 날 복사
+            Expanded(
+              child: _buildActionButton(
+                icon: Icons.content_copy_outlined,
+                label: '다른 날 복사',
+                color: Colors.green,
+                onTap: controller.showCopyScheduleDialog,
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // 전체 삭제
+            Expanded(
+              child: _buildActionButton(
+                icon: Icons.delete_sweep_outlined,
+                label: '전체 삭제',
+                color: Colors.red,
+                onTap: _showDeleteAllDialog,
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  /// 액션 버튼 (추가)
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: color.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: color,
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildScheduleList() {
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),  // 상단 패딩 16 -> 8로 조정
       itemCount: controller.schedules.length,
       itemBuilder: (context, index) {
         final schedule = controller.schedules[index];
@@ -171,7 +245,7 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
 
                 const SizedBox(width: 16),
 
-                // 복사하기 버튼
+                // 다른 날 복사 버튼
                 OutlinedButton.icon(
                   onPressed: () => controller.showCopyScheduleDialog(),
                   icon: const Icon(Icons.copy),
@@ -213,35 +287,6 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildTimelineHeader() {
-    return Container(
-      height: 60,
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(Get.context!).primaryColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          // 0시부터 23시까지 시간 표시
-          for (int hour = 0; hour < 24; hour += 6)
-            Expanded(
-              child: Center(
-                child: Text(
-                  '${hour.toString().padLeft(2, '0')}시',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Theme.of(Get.context!).primaryColor,
-                  ),
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }
@@ -731,6 +776,268 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
               child: const Text('전체 삭제'),
             ),
           ],
+        );
+      },
+    );
+  }
+}
+/// 다른 날 적용 다이얼로그
+class ApplyToOtherDatesDialog extends StatefulWidget {
+  final ScheduleSettingController controller;
+
+  const ApplyToOtherDatesDialog({super.key, required this.controller});
+
+  @override
+  State<ApplyToOtherDatesDialog> createState() => _ApplyToOtherDatesDialogState();
+}
+
+class _ApplyToOtherDatesDialogState extends State<ApplyToOtherDatesDialog> {
+  final Set<DateTime> _selectedDates = {};
+  DateTime _displayMonth = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _displayMonth = DateTime(
+      widget.controller.selectedDate.year,
+      widget.controller.selectedDate.month,
+      1,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('다른 날 적용'),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 500,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 안내 메시지
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 20, color: Colors.blue[700]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${widget.controller.selectedDate.month}/${widget.controller.selectedDate.day}일의 스케줄을\n적용할 날짜를 선택하세요',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // 월 선택
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed: () {
+                    setState(() {
+                      _displayMonth = DateTime(_displayMonth.year, _displayMonth.month - 1, 1);
+                    });
+                  },
+                ),
+                Text(
+                  '${_displayMonth.year}년 ${_displayMonth.month}월',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed: () {
+                    setState(() {
+                      _displayMonth = DateTime(_displayMonth.year, _displayMonth.month + 1, 1);
+                    });
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // 요일 헤더
+            _buildWeekHeader(),
+            const SizedBox(height: 8),
+
+            // 달력
+            Expanded(
+              child: _buildCalendar(),
+            ),
+
+            const SizedBox(height: 12),
+
+            // 선택된 날짜 표시
+            if (_selectedDates.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '선택된 날짜: ${_selectedDates.length}개',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: _selectedDates.map((date) {
+                        return Chip(
+                          label: Text(
+                            '${date.month}/${date.day}',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          onDeleted: () {
+                            setState(() {
+                              _selectedDates.remove(date);
+                            });
+                          },
+                          deleteIconColor: Colors.grey[600],
+                          visualDensity: VisualDensity.compact,
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('취소'),
+        ),
+        ElevatedButton(
+          onPressed: _selectedDates.isEmpty
+              ? null
+              : () async {
+            Navigator.of(context).pop();
+            await Future.delayed(const Duration(milliseconds: 200));
+            await widget.controller.copySchedulesToMultipleDates(
+              _selectedDates.toList(),
+            );
+          },
+          child: const Text('적용'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWeekHeader() {
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+
+    return Row(
+      children: weekdays.map((day) => Expanded(
+        child: Center(
+          child: Text(
+            day,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              color: day == '일' ? Colors.red :
+              day == '토' ? Colors.blue : Colors.grey[700],
+            ),
+          ),
+        ),
+      )).toList(),
+    );
+  }
+
+  Widget _buildCalendar() {
+    final daysInMonth = DateTime(_displayMonth.year, _displayMonth.month + 1, 0).day;
+    final firstDayOfWeek = DateTime(_displayMonth.year, _displayMonth.month, 1).weekday % 7;
+
+    return GridView.builder(
+      shrinkWrap: true,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 7,
+        childAspectRatio: 1.0,
+        crossAxisSpacing: 4,
+        mainAxisSpacing: 4,
+      ),
+      itemCount: 42,
+      itemBuilder: (context, index) {
+        final day = index - firstDayOfWeek + 1;
+
+        if (day <= 0 || day > daysInMonth) {
+          return Container();
+        }
+
+        final date = DateTime(_displayMonth.year, _displayMonth.month, day);
+        final isSelected = _selectedDates.contains(date);
+        final isCurrentDate = date.year == widget.controller.selectedDate.year &&
+            date.month == widget.controller.selectedDate.month &&
+            date.day == widget.controller.selectedDate.day;
+
+        return GestureDetector(
+          onTap: isCurrentDate
+              ? null
+              : () {
+            setState(() {
+              if (isSelected) {
+                _selectedDates.remove(date);
+              } else {
+                _selectedDates.add(date);
+              }
+            });
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: isCurrentDate
+                  ? Colors.grey[300]
+                  : isSelected
+                  ? Theme.of(context).primaryColor
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isCurrentDate
+                    ? Colors.grey[500]!
+                    : isSelected
+                    ? Theme.of(context).primaryColor
+                    : Colors.grey[300]!,
+                width: isSelected ? 2 : 1,
+              ),
+            ),
+            child: Center(
+              child: Text(
+                '$day',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isCurrentDate
+                      ? Colors.grey[700]
+                      : isSelected
+                      ? Colors.white
+                      : Colors.black87,
+                ),
+              ),
+            ),
+          ),
         );
       },
     );
