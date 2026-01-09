@@ -67,5 +67,16 @@
     <array>
         <string>applinks:iuzusurmnktpfqunfjsh.supabase.co</string>
     </array>
+    <!-- 카메라 권한 -->
+    <key>NSCameraUsageDescription</key>
+    <string>근로계약서 촬영을 위해 카메라 접근이 필요합니다.</string>
+
+    <!-- 사진 라이브러리 권한 -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>근로계약서 이미지 선택을 위해 사진 라이브러리 접근이 필요합니다.</string>
+
+    <!-- iOS 14+ 사진 라이브러리 추가 권한 -->
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>촬영한 근로계약서를 저장하기 위해 사진 라이브러리 접근이 필요합니다.</string>
 </dict>
 </plist>

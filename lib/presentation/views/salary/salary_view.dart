@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../app/routes/app_routes.dart';
+import '../../../app/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../controllers/salary_controller.dart';
@@ -144,7 +146,31 @@ class SalaryView extends GetView<SalaryController> {
             const SizedBox(height: 16),
             _buildInfoRow('이름', employee.name),
             const SizedBox(height: 8),
-            _buildInfoRow('전화번호', employee.phoneNumber),
+            InkWell(
+              onTap: () => _makePhoneCall(employee.phoneNumber),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('전화번호'),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        employee.phoneNumber,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        Icons.call,
+                        size: 16,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
             const SizedBox(height: 8),
             _buildInfoRow(
               '시급',
@@ -836,5 +862,22 @@ class SalaryView extends GetView<SalaryController> {
         ),
       ],
     );
+  }
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final cleanNumber = phoneNumber.replaceAll('-', '');
+    final Uri phoneUri = Uri(scheme: 'tel', path: cleanNumber);
+
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        Clipboard.setData(ClipboardData(text: phoneNumber));
+        SnackbarHelper.showCopied('전화번호가 복사되었습니다.');
+      }
+    } catch (e) {
+      Clipboard.setData(ClipboardData(text: phoneNumber));
+      SnackbarHelper.showCopied('전화번호가 복사되었습니다.');
+    }
   }
 }
