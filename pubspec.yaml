@@ -21,6 +21,7 @@ dependencies:
   supabase_flutter: ^2.5.0
   package_info_plus: ^9.0.0
   connectivity_plus: ^7.0.0
+  photo_view: ^0.15.0
 
 dev_dependencies:
   flutter_test:

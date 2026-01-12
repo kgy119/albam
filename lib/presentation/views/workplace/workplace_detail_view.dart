@@ -1251,6 +1251,7 @@ class _WorkplaceEditScheduleDialogState extends State<_WorkplaceEditScheduleDial
                 prefixIcon: Icon(Icons.note),
               ),
               maxLines: 1,
+              maxLength: 20,
               textInputAction: TextInputAction.done,
             ),
           ],

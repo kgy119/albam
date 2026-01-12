@@ -12,6 +12,7 @@ import '../views/schedule/schedule_setting_view.dart';
 class ScheduleSettingController extends GetxController {
   final EmployeeService _employeeService = EmployeeService();
   final ScheduleService _scheduleService = ScheduleService();
+  final RxBool _isDialogShowing = false.obs; // 다이얼로그 표시 상태 추가
 
   // 전달받은 데이터
   late Workplace workplace;
@@ -416,116 +417,188 @@ class ScheduleSettingController extends GetxController {
 
   /// 스케줄 복사 다이얼로그 표시
   void showCopyScheduleDialog() async {
-    final scheduleDates = await getScheduleDates();
-
-    if (scheduleDates.isEmpty) {
-      SnackbarHelper.showWarning('복사할 수 있는 스케줄이 없습니다.');
+    // 🔒 async 시작 즉시 잠금
+    if (_isDialogShowing.value) {
+      debugPrint('다이얼로그가 이미 표시 중입니다');
       return;
     }
+    _isDialogShowing.value = true;
 
-    final currentWeekday = selectedDate.weekday;
-    final currentWeekdayText = date_utils.DateUtils.getWeekdayText(currentWeekday);
+    try {
+      final scheduleDates = await getScheduleDates();
 
-    showDialog(
-      context: Get.context!,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        final allSameWeekdayDates = scheduleDates
-            .where((date) => date.weekday == currentWeekday)
-            .toList();
+      if (scheduleDates.isEmpty) {
+        SnackbarHelper.showWarning('복사할 수 있는 스케줄이 없습니다.');
+        return;
+      }
 
-        final topSameWeekdayDates = allSameWeekdayDates.take(3).toList();
+      final currentWeekday = selectedDate.weekday;
+      final currentWeekdayText =
+      date_utils.DateUtils.getWeekdayText(currentWeekday);
 
-        final otherDates = scheduleDates
-            .where((date) => date.weekday != currentWeekday)
-            .toList();
+      await showDialog(
+        context: Get.context!,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          final allSameWeekdayDates = scheduleDates
+              .where((date) => date.weekday == currentWeekday)
+              .toList();
 
-        return AlertDialog(
-          title: Text('스케줄 복사 ($currentWeekdayText)'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('복사할 날짜를 선택하세요:'),
-                const SizedBox(height: 8),
-                Text(
-                  '최근 2개월 이내의 스케줄',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: 400,
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: [
-                      // 같은 요일 섹션
-                      if (topSameWeekdayDates.isNotEmpty) ...[
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                          child: Row(
+          final topSameWeekdayDates = allSameWeekdayDates.take(3).toList();
+
+          final otherDates = scheduleDates
+              .where((date) => date.weekday != currentWeekday)
+              .toList();
+
+          // 확장 상태
+          Map<String, bool> expandedStates = {};
+
+          return WillPopScope(
+            onWillPop: () async => true,
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                return AlertDialog(
+                  title: Text('스케줄 복사 ($currentWeekdayText)'),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('복사할 날짜를 선택하세요:'),
+                        const SizedBox(height: 8),
+                        Text(
+                          '최근 2개월 이내의 스케줄',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          height: 400,
+                          child: ListView(
+                            shrinkWrap: true,
                             children: [
-                              Icon(
-                                Icons.star,
-                                size: 16,
-                                color: Colors.orange[700],
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                '같은 요일 ($currentWeekdayText)',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.orange[700],
+                              // ⭐ 같은 요일
+                              if (topSameWeekdayDates.isNotEmpty) ...[
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 8),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.star,
+                                        size: 16,
+                                        color: Colors.orange[700],
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '같은 요일 ($currentWeekdayText)',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.orange[700],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
+                                ...topSameWeekdayDates.map((date) {
+                                  final key =
+                                      '${date.year}-${date.month}-${date.day}';
+                                  return _buildExpandableDateCard(
+                                    date: date,
+                                    isSameWeekday: true,
+                                    isExpanded:
+                                    expandedStates[key] ?? false,
+                                    onTap: () {
+                                      setState(() {
+                                        expandedStates[key] =
+                                        !(expandedStates[key] ?? false);
+                                      });
+                                    },
+                                    onCopy: () {
+                                      Navigator.of(context).pop();
+                                      _showCopyConfirmDialog(date);
+                                    },
+                                  );
+                                }),
+                                const SizedBox(height: 16),
+                              ],
+
+                              // 📅 다른 날짜
+                              if (otherDates.isNotEmpty) ...[
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 8),
+                                  child: Text(
+                                    '다른 날짜',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ),
+                                ...otherDates.map((date) {
+                                  final key =
+                                      '${date.year}-${date.month}-${date.day}';
+                                  return _buildExpandableDateCard(
+                                    date: date,
+                                    isSameWeekday: false,
+                                    isExpanded:
+                                    expandedStates[key] ?? false,
+                                    onTap: () {
+                                      setState(() {
+                                        expandedStates[key] =
+                                        !(expandedStates[key] ?? false);
+                                      });
+                                    },
+                                    onCopy: () {
+                                      Navigator.of(context).pop();
+                                      _showCopyConfirmDialog(date);
+                                    },
+                                  );
+                                }),
+                              ],
                             ],
                           ),
                         ),
-                        ...topSameWeekdayDates.map((date) => _buildDateCard(date, true)),
-                        const SizedBox(height: 16),
                       ],
-
-                      // 다른 날짜 섹션
-                      if (otherDates.isNotEmpty) ...[
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                          child: Text(
-                            '다른 날짜',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                        ),
-                        ...otherDates.map((date) => _buildDateCard(date, false)),
-                      ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('취소'),
+                    ),
+                  ],
+                );
+              },
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('취소'),
-            ),
-          ],
-        );
-      },
-    );
+          );
+        },
+      );
+    } finally {
+      // 🔓 어떤 경우든 반드시 해제
+      _isDialogShowing.value = false;
+    }
   }
 
-  Widget _buildDateCard(DateTime date, bool isSameWeekday) {
-    final isCurrentMonth = date.year == selectedDate.year &&
-        date.month == selectedDate.month;
+
+  /// 확장 가능한 날짜 카드 빌더
+  Widget _buildExpandableDateCard({
+    required DateTime date,
+    required bool isSameWeekday,
+    required bool isExpanded,
+    required VoidCallback onTap,
+    required VoidCallback onCopy,
+  }) {
     final weekday = date.weekday;
+    final currentYear = DateTime.now().year;
+    final currentMonth = DateTime.now().month;
+    final isCurrentMonth = date.year == currentYear && date.month == currentMonth;
 
     return FutureBuilder<List<Schedule>>(
       future: getSchedulesByDate(date),
@@ -536,98 +609,211 @@ class ScheduleSettingController extends GetxController {
               (sum, schedule) => sum + (schedule.totalMinutes / 60.0),
         );
 
-        return Card(
-          color: isSameWeekday
-              ? Colors.orange[50]
-              : (isCurrentMonth ? null : Colors.grey[50]),
-          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          child: InkWell(
-            onTap: () async {
-              Navigator.of(Get.context!).pop();
-              await Future.delayed(const Duration(milliseconds: 200));
-              _showCopyConfirmDialog(date);
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: isSameWeekday
-                        ? Colors.orange[700]
-                        : date_utils.DateUtils.getWeekdayColorForLightBg(
-                      weekday,
-                      dimmed: !isCurrentMonth,
-                    ),
-                    child: Text(
-                      date_utils.DateUtils.getWeekdayText(weekday),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+        return Column(
+          children: [
+            InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: isSameWeekday
+                          ? Colors.orange[700]
+                          : date_utils.DateUtils.getWeekdayColorForLightBg(
+                        weekday,
+                        dimmed: !isCurrentMonth,
+                      ),
+                      child: Text(
+                        date_utils.DateUtils.getWeekdayText(weekday),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              '${date.month}/${date.day}일',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                color: date_utils.DateUtils.getWeekdayTextColor(weekday),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                '${date.month}/${date.day}일',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: date_utils.DateUtils.getWeekdayTextColor(weekday),
+                                ),
                               ),
-                            ),
-                            if (!isCurrentMonth) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[300],
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  '지난 달',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey[700],
-                                    fontWeight: FontWeight.bold,
+                              if (!isCurrentMonth) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[300],
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '지난 달',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey[700],
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ],
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${schedules.length}개 스케줄 • ${totalHours.toStringAsFixed(1)}시간',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
                           ),
-                          overflow: TextOverflow.ellipsis,
+                          const SizedBox(height: 4),
+                          Text(
+                            '${schedules.length}개 스케줄 • ${totalHours.toStringAsFixed(1)}시간',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isExpanded ? Icons.expand_less : Icons.expand_more,
+                          color: isSameWeekday ? Colors.orange[700] : Colors.grey[600],
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: Icon(
+                            Icons.copy,
+                            color: isSameWeekday ? Colors.orange[700] : Colors.grey[600],
+                            size: 20,
+                          ),
+                          onPressed: onCopy,
                         ),
                       ],
                     ),
-                  ),
-                  Icon(
-                    Icons.copy,
-                    color: isSameWeekday ? Colors.orange[700] : Colors.grey[600],
-                    size: 20,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
+            // 확장된 스케줄 상세 내용
+            if (isExpanded && schedules.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: schedules.map((schedule) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundColor: schedule.isSubstitute
+                                ? Colors.orange.withOpacity(0.2)
+                                : Theme.of(Get.context!).primaryColor.withOpacity(0.2),
+                            child: Text(
+                              schedule.employeeName.isNotEmpty ? schedule.employeeName[0] : '?',
+                              style: TextStyle(
+                                color: schedule.isSubstitute
+                                    ? Colors.orange[700]
+                                    : Theme.of(Get.context!).primaryColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      schedule.employeeName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    if (schedule.isSubstitute) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: const Text(
+                                          '대체',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${schedule.timeRangeString} (${schedule.workTimeString})',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            if (isExpanded && schedules.isEmpty)
+              Container(
+                margin: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Center(
+                  child: Text(
+                    '스케줄이 없습니다',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );
@@ -970,6 +1156,7 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
                 prefixIcon: Icon(Icons.note),
               ),
               maxLines: 1,
+              maxLength: 20,
               textInputAction: TextInputAction.done,
             ),
           ],
@@ -1143,6 +1330,7 @@ class _EditScheduleDialogState extends State<_EditScheduleDialog> {
                 prefixIcon: Icon(Icons.note),
               ),
               maxLines: 1,
+              maxLength: 20,
               textInputAction: TextInputAction.done,
             ),
           ],

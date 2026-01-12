@@ -9,6 +9,7 @@ import '../../../core/services/storage_service.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../controllers/workplace_detail_controller.dart';
 import '../../../data/models/employee_model.dart';
+import 'contract_image_viewer.dart';
 
 class EditEmployeeView extends StatefulWidget {
   const EditEmployeeView({super.key});
@@ -576,91 +577,124 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
                                 ),
                               ] else if (employee.contractImageUrl != null && !_isImageDeleted) ...[
                                 // ✅ 기존 이미지 (Signed URL 사용)
-                                Container(
-                                  height: 200,
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.grey[300]!),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Stack(
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: _isLoadingImageUrl
-                                            ? const Center(
-                                          child: CircularProgressIndicator(),
-                                        )
-                                            : _displayImageUrl != null
-                                            ? Image.network(
-                                          _displayImageUrl!,
-                                          fit: BoxFit.cover,
-                                          width: double.infinity,
-                                          loadingBuilder: (context, child, loadingProgress) {
-                                            if (loadingProgress == null) return child;
-                                            return Center(
-                                              child: CircularProgressIndicator(
-                                                value: loadingProgress.expectedTotalBytes != null
-                                                    ? loadingProgress.cumulativeBytesLoaded /
-                                                    loadingProgress.expectedTotalBytes!
-                                                    : null,
-                                              ),
-                                            );
-                                          },
-                                          errorBuilder: (context, error, stackTrace) {
-                                            print('이미지 로드 오류: $error');
-                                            return Container(
-                                              color: Colors.grey[100],
-                                              child: Column(
-                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                children: [
-                                                  Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
-                                                  const SizedBox(height: 8),
-                                                  const Text(
-                                                    '이미지를 불러올 수 없습니다',
-                                                    style: TextStyle(color: Colors.red),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    '다시 업로드해주세요',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey[600],
+                                GestureDetector(
+                                  onTap: _displayImageUrl != null && !_isLoadingImageUrl
+                                      ? () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ContractImageViewer(
+                                          imageUrl: _displayImageUrl!,
+                                          employeeName: employee.name,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                      : null,
+                                  child: Container(
+                                    height: 200,
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.grey[300]!),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Stack(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: _isLoadingImageUrl
+                                              ? const Center(
+                                            child: CircularProgressIndicator(),
+                                          )
+                                              : _displayImageUrl != null
+                                              ? Image.network(
+                                            _displayImageUrl!,
+                                            fit: BoxFit.cover,
+                                            width: double.infinity,
+                                            loadingBuilder: (context, child, loadingProgress) {
+                                              if (loadingProgress == null) return child;
+                                              return Center(
+                                                child: CircularProgressIndicator(
+                                                  value: loadingProgress.expectedTotalBytes != null
+                                                      ? loadingProgress.cumulativeBytesLoaded /
+                                                      loadingProgress.expectedTotalBytes!
+                                                      : null,
+                                                ),
+                                              );
+                                            },
+                                            errorBuilder: (context, error, stackTrace) {
+                                              print('이미지 로드 오류: $error');
+                                              return Container(
+                                                color: Colors.grey[100],
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                                                    const SizedBox(height: 8),
+                                                    const Text(
+                                                      '이미지를 불러올 수 없습니다',
+                                                      style: TextStyle(color: Colors.red),
                                                     ),
-                                                  ),
-                                                  const SizedBox(height: 12),
-                                                  ElevatedButton.icon(
-                                                    onPressed: _pickImage,
-                                                    icon: const Icon(Icons.refresh, size: 16),
-                                                    label: const Text('다시 선택'),
-                                                    style: ElevatedButton.styleFrom(
-                                                      padding: const EdgeInsets.symmetric(
-                                                        horizontal: 16,
-                                                        vertical: 8,
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      '다시 업로드해주세요',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.grey[600],
                                                       ),
                                                     ),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                        )
-                                            : const Center(
-                                          child: CircularProgressIndicator(),
-                                        ),
-                                      ),
-                                      Positioned(
-                                        top: 8,
-                                        right: 8,
-                                        child: IconButton(
-                                          icon: const Icon(Icons.delete, color: Colors.white),
-                                          style: IconButton.styleFrom(
-                                            backgroundColor: Colors.red,
+                                                    const SizedBox(height: 12),
+                                                    ElevatedButton.icon(
+                                                      onPressed: _pickImage,
+                                                      icon: const Icon(Icons.refresh, size: 16),
+                                                      label: const Text('다시 선택'),
+                                                      style: ElevatedButton.styleFrom(
+                                                        padding: const EdgeInsets.symmetric(
+                                                          horizontal: 16,
+                                                          vertical: 8,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                          )
+                                              : const Center(
+                                            child: CircularProgressIndicator(),
                                           ),
-                                          onPressed: _showDeleteImageDialog,
                                         ),
-                                      ),
-                                    ],
+                                        // 확대 아이콘 오버레이 추가
+                                        if (_displayImageUrl != null && !_isLoadingImageUrl)
+                                          Positioned(
+                                            top: 8,
+                                            left: 8,
+                                            child: Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withOpacity(0.6),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: const Icon(
+                                                Icons.zoom_in,
+                                                color: Colors.white,
+                                                size: 20,
+                                              ),
+                                            ),
+                                          ),
+                                        Positioned(
+                                          top: 8,
+                                          right: 8,
+                                          child: IconButton(
+                                            icon: const Icon(Icons.delete, color: Colors.white),
+                                            style: IconButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                            ),
+                                            onPressed: _showDeleteImageDialog,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ] else ...[
