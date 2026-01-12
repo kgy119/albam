@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/services/auth_service.dart';
 import '../../app/routes/app_routes.dart';
+import '../../core/services/connectivity_service.dart';
 
 class AuthController extends GetxController {
   final AuthService _authService = Get.find<AuthService>();
@@ -155,6 +156,13 @@ class AuthController extends GetxController {
   Future<void> signInWithEmail() async {
     if (isEmailLoading.value || !canSubmit) return;
 
+    // ✅ 인터넷 연결 확인
+    final connectivityService = Get.find<ConnectivityService>();
+    if (!connectivityService.isConnected.value) {
+      errorMessage.value = '인터넷 연결이 필요합니다.';
+      return;
+    }
+
     try {
       isEmailLoading.value = true;
       errorMessage.value = '';
@@ -178,6 +186,13 @@ class AuthController extends GetxController {
   /// 이메일/비밀번호 회원가입
   Future<void> signUpWithEmail() async {
     if (isEmailLoading.value || !canSubmit) return;
+
+    // ✅ 인터넷 연결 확인
+    final connectivityService = Get.find<ConnectivityService>();
+    if (!connectivityService.isConnected.value) {
+      errorMessage.value = '인터넷 연결이 필요합니다.';
+      return;
+    }
 
     try {
       isEmailLoading.value = true;
@@ -254,15 +269,23 @@ class AuthController extends GetxController {
   Future<void> signInWithGoogle() async {
     if (isGoogleLoading.value) return;
 
+    // ✅ 인터넷 연결 확인
+    final connectivityService = Get.find<ConnectivityService>();
+    if (!connectivityService.isConnected.value) {
+      errorMessage.value = '인터넷 연결이 필요합니다.';
+      return;
+    }
+
     try {
       isGoogleLoading.value = true;
       errorMessage.value = '';
-      successMessage.value = '';
+      successMessage.value = ''; // ✅ 메시지 제거
 
       final result = await _authService.signInWithGoogle();
 
       if (result['success'] == true) {
-        successMessage.value = 'Google 로그인이 완료되었습니다.';
+        // ✅ 성공 메시지 제거 (자동으로 홈 화면으로 이동)
+        // successMessage.value = 'Google 로그인이 완료되었습니다.';
       } else if (result['error'] != null) {
         errorMessage.value = result['error'];
       }

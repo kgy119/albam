@@ -8,6 +8,7 @@ import 'app/routes/app_pages.dart';
 import 'app/routes/app_routes.dart';
 import 'app/theme/app_theme.dart';
 import 'core/services/auth_service.dart';
+import 'core/services/connectivity_service.dart';
 import 'core/services/workplace_service.dart';
 import 'core/services/minimum_wage_service.dart';
 
@@ -35,6 +36,7 @@ void main() async {
   await Get.putAsync(() => AuthService().init());
   print('✅ AuthService 등록 완료');
 
+  Get.put(ConnectivityService());
   Get.put(WorkplaceService());
   print('✅ WorkplaceService 등록 완료');
 

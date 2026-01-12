@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import '../../core/services/connectivity_service.dart';
 import '../../core/utils/snackbar_helper.dart';
 import '../../data/models/workplace_model.dart';
 import '../../core/services/workplace_service.dart';
@@ -61,6 +62,14 @@ class WorkplaceController extends GetxController {
 
 
   Future<void> addWorkplace(String name) async {
+
+    // ✅ 인터넷 연결 확인
+    final connectivityService = Get.find<ConnectivityService>();
+    if (!connectivityService.isConnected.value) {
+      SnackbarHelper.showError('인터넷 연결이 필요합니다.');
+      return;
+    }
+
     try {
       isAdding.value = true;
 
