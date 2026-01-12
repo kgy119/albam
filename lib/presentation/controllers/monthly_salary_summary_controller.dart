@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/services/employee_service.dart';
 import '../../core/services/schedule_service.dart';
+import '../../core/services/payment_service.dart'; // ✅ 추가
 import '../../core/utils/snackbar_helper.dart';
 import '../../data/models/workplace_model.dart';
 import '../../data/models/employee_model.dart';
@@ -11,6 +12,7 @@ import '../../core/utils/salary_calculator.dart';
 class MonthlySalarySummaryController extends GetxController {
   final EmployeeService _employeeService = EmployeeService();
   final ScheduleService _scheduleService = ScheduleService();
+  final PaymentService _paymentService = PaymentService(); // ✅ 추가
 
   Rxn<Workplace> workplace = Rxn<Workplace>();
   RxInt year = DateTime.now().year.obs;
@@ -94,11 +96,20 @@ class MonthlySalarySummaryController extends GetxController {
         );
       }
 
+      // ✅ 급여 지급 기록 일괄 조회
+      final employeeIds = employees.map((e) => e.id).toList();
+      final paymentRecords = await _paymentService.getPaymentRecordsByMonth(
+        employeeIds: employeeIds,
+        year: year.value,
+        month: month.value,
+      );
+
       // 통계 계산
-      await _calculateStats(employees, schedules, previousMonthSchedules);
+      await _calculateStats(employees, schedules, previousMonthSchedules, paymentRecords); // ✅ 수정
     } catch (e) {
       print('급여 로드 오류: $e');
       SnackbarHelper.showError('급여 정보를 불러오는데 실패했습니다.');
+      monthlyStats.value = {};
     } finally {
       isLoading.value = false;
     }
@@ -109,6 +120,7 @@ class MonthlySalarySummaryController extends GetxController {
       List<Employee> employees,
       List<Schedule> schedules,
       List<Schedule> previousMonthSchedules,
+      Map<String, dynamic> paymentRecords, // ✅ 추가
       ) async {
     double totalHours = 0;
     double totalRegularHours = 0;
@@ -145,10 +157,14 @@ class MonthlySalarySummaryController extends GetxController {
           .toSet()
           .length;
 
+      // ✅ 지급 기록 추가
+      final paymentRecord = paymentRecords[employee.id];
+
       employeeSalaries.add({
         'employee': employee,
         'salaryData': salaryData,
         'workDays': workDays,
+        'paymentRecord': paymentRecord, // ✅ 추가
       });
 
       totalHours += salaryData['totalHours'];
@@ -162,8 +178,13 @@ class MonthlySalarySummaryController extends GetxController {
       totalNetPay += salaryData['netPay'];
     }
 
-    // 실수령액 기준 내림차순 정렬
+    // ✅ 정렬: 지급 안 된 직원 우선
     employeeSalaries.sort((a, b) {
+      final aPaid = a['paymentRecord'] != null;
+      final bPaid = b['paymentRecord'] != null;
+      if (aPaid != bPaid) return aPaid ? 1 : -1;
+
+      // 실수령액 기준 내림차순
       final aNetPay = (a['salaryData'] as Map<String, dynamic>)['netPay'] as double;
       final bNetPay = (b['salaryData'] as Map<String, dynamic>)['netPay'] as double;
       return bNetPay.compareTo(aNetPay);
@@ -182,82 +203,77 @@ class MonthlySalarySummaryController extends GetxController {
       'employeeCount': employeeSalaries.length,
       'employeeSalaries': employeeSalaries,
     };
-
-    print('통계 계산 완료');
   }
 
-  /// 월 선택 다이얼로그
+  /// 년월 선택 다이얼로그 표시
   void showMonthPicker() {
+    int selectedYear = year.value;
+    int selectedMonth = month.value;
+
     showDialog(
       context: Get.context!,
-      builder: (BuildContext context) {
-        int selectedYear = year.value;
-        int selectedMonth = month.value;
-
+      builder: (BuildContext dialogContext) {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text('월 선택'),
-              content: SizedBox(
-                width: 300,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 년도 선택
-                    DropdownButtonFormField<int>(
-                      decoration: const InputDecoration(
-                        labelText: '년도',
-                        border: OutlineInputBorder(),
-                      ),
-                      value: selectedYear,
-                      items: List.generate(5, (index) {
-                        final year = DateTime.now().year - 2 + index;
-                        return DropdownMenuItem(
-                          value: year,
-                          child: Text('$year년'),
-                        );
-                      }),
-                      onChanged: (value) {
-                        setState(() {
-                          selectedYear = value!;
-                        });
-                      },
+              title: const Text('년월 선택'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 년도 선택
+                  DropdownButtonFormField<int>(
+                    value: selectedYear,
+                    decoration: const InputDecoration(
+                      labelText: '년도',
+                      border: OutlineInputBorder(),
                     ),
-                    const SizedBox(height: 16),
+                    items: List.generate(5, (index) {
+                      final y = DateTime.now().year - 2 + index;
+                      return DropdownMenuItem(
+                        value: y,
+                        child: Text('$y년'),
+                      );
+                    }),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedYear = value!;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
 
-                    // 월 선택
-                    DropdownButtonFormField<int>(
-                      decoration: const InputDecoration(
-                        labelText: '월',
-                        border: OutlineInputBorder(),
-                      ),
-                      value: selectedMonth,
-                      items: List.generate(12, (index) {
-                        final month = index + 1;
-                        return DropdownMenuItem(
-                          value: month,
-                          child: Text('$month월'),
-                        );
-                      }),
-                      onChanged: (value) {
-                        setState(() {
-                          selectedMonth = value!;
-                        });
-                      },
+                  // 월 선택
+                  DropdownButtonFormField<int>(
+                    value: selectedMonth,
+                    decoration: const InputDecoration(
+                      labelText: '월',
+                      border: OutlineInputBorder(),
                     ),
-                  ],
-                ),
+                    items: List.generate(12, (index) {
+                      final m = index + 1;
+                      return DropdownMenuItem(
+                        value: m,
+                        child: Text('$m월'),
+                      );
+                    }),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedMonth = value!;
+                      });
+                    },
+                  ),
+                ],
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => Navigator.of(dialogContext).pop(),
                   child: const Text('취소'),
                 ),
                 ElevatedButton(
                   onPressed: () {
+                    Navigator.of(dialogContext).pop();
                     year.value = selectedYear;
                     month.value = selectedMonth;
-                    Navigator.of(context).pop();
                     loadMonthlySalaries();
                   },
                   child: const Text('확인'),

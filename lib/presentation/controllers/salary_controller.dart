@@ -1,21 +1,31 @@
 import 'package:get/get.dart';
 import '../../core/services/employee_service.dart';
 import '../../core/services/schedule_service.dart';
+import '../../core/services/payment_service.dart'; // ✅ 추가
 import '../../data/models/employee_model.dart';
 import '../../data/models/schedule_model.dart';
+import '../../data/models/payment_record_model.dart'; // ✅ 추가
 import '../../core/utils/salary_calculator.dart';
-import '../../core/utils/snackbar_helper.dart'; // ✅ 추가
+import '../../core/utils/snackbar_helper.dart';
 
 class SalaryController extends GetxController {
   final EmployeeService _employeeService = EmployeeService();
   final ScheduleService _scheduleService = ScheduleService();
+  final PaymentService _paymentService = PaymentService();
 
   RxBool isLoading = false.obs;
   Rxn<Map<String, dynamic>> salaryData = Rxn<Map<String, dynamic>>();
   Rxn<Employee> currentEmployee = Rxn<Employee>();
+  Rxn<PaymentRecord> paymentRecord = Rxn<PaymentRecord>();
 
   RxList<Schedule> monthlySchedules = <Schedule>[].obs;
   RxInt selectedDay = 0.obs;
+
+  int? currentYear;
+  int? currentMonth;
+
+  bool _paymentStatusChanged = false; // ✅ 추가
+  bool _initialPaymentStatus = false; // ✅ 추가
 
   @override
   void onInit() {
@@ -29,6 +39,8 @@ class SalaryController extends GetxController {
 
       if (employee != null && year != null && month != null) {
         currentEmployee.value = employee;
+        currentYear = year;
+        currentMonth = month;
         calculateEmployeeSalary(
           employee: employee,
           year: year,
@@ -38,7 +50,6 @@ class SalaryController extends GetxController {
     }
   }
 
-  /// 직원의 월별 급여 계산
   Future<void> calculateEmployeeSalary({
     required Employee employee,
     required int year,
@@ -46,24 +57,31 @@ class SalaryController extends GetxController {
   }) async {
     isLoading.value = true;
     try {
-      // 최신 직원 정보 다시 가져오기 (시급 변경 등 반영)
       final latestEmployee = await _employeeService.getEmployee(employee.id);
 
       if (latestEmployee == null) {
-        SnackbarHelper.showError('직원 정보를 찾을 수 없습니다.'); // ✅ 수정
+        SnackbarHelper.showError('직원 정보를 찾을 수 없습니다.');
         return;
       }
 
       currentEmployee.value = latestEmployee;
+      currentYear = year;
+      currentMonth = month;
 
-      // 현재 월 스케줄 조회
+      paymentRecord.value = await _paymentService.getPaymentRecord(
+        employeeId: latestEmployee.id,
+        year: year,
+        month: month,
+      );
+
+      _initialPaymentStatus = paymentRecord.value != null; // ✅ 초기 상태 저장
+
       final schedules = await _scheduleService.getEmployeeMonthlySchedules(
         employeeId: latestEmployee.id,
         year: year,
         month: month,
       );
 
-      // 전달 스케줄 조회 (0주차 주휴수당 계산용)
       List<Schedule> previousMonthSchedules = [];
       if (month == 1) {
         previousMonthSchedules = await _scheduleService.getEmployeeMonthlySchedules(
@@ -81,7 +99,6 @@ class SalaryController extends GetxController {
 
       monthlySchedules.value = schedules;
 
-      // 급여 계산 (전달 스케줄 포함)
       salaryData.value = SalaryCalculator.calculateMonthlySalary(
         schedules: schedules,
         hourlyWage: latestEmployee.hourlyWage.toDouble(),
@@ -91,12 +108,78 @@ class SalaryController extends GetxController {
       print('급여 계산 완료');
     } catch (e) {
       print('급여 계산 오류: $e');
-      SnackbarHelper.showError('급여 계산 중 문제가 발생했습니다.'); // ✅ 수정
+      SnackbarHelper.showError('급여 계산 중 문제가 발생했습니다.');
     } finally {
       isLoading.value = false;
     }
   }
 
+  Future<void> recordPayment() async {
+    if (currentEmployee.value == null || currentYear == null || currentMonth == null) {
+      SnackbarHelper.showError('급여 정보가 없습니다.');
+      return;
+    }
+
+    final salary = salaryData.value;
+    if (salary == null) {
+      SnackbarHelper.showError('급여 계산 정보가 없습니다.');
+      return;
+    }
+
+    try {
+      isLoading.value = true;
+
+      final record = await _paymentService.recordPayment(
+        employeeId: currentEmployee.value!.id,
+        year: currentYear!,
+        month: currentMonth!,
+        amount: salary['netPay'],
+      );
+
+      paymentRecord.value = record;
+      _paymentStatusChanged = true; // ✅ 상태 변경 표시
+      SnackbarHelper.showSuccess('급여 지급이 완료되었습니다.');
+    } catch (e) {
+      print('급여 지급 오류: $e');
+      SnackbarHelper.showError('급여 지급 처리 중 오류가 발생했습니다.');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> cancelPayment() async {
+    if (currentEmployee.value == null || currentYear == null || currentMonth == null) {
+      SnackbarHelper.showError('급여 정보가 없습니다.');
+      return;
+    }
+
+    try {
+      isLoading.value = true;
+
+      await _paymentService.cancelPayment(
+        employeeId: currentEmployee.value!.id,
+        year: currentYear!,
+        month: currentMonth!,
+      );
+
+      paymentRecord.value = null;
+      _paymentStatusChanged = true; // ✅ 상태 변경 표시
+      SnackbarHelper.showSuccess('급여 지급이 취소되었습니다.');
+    } catch (e) {
+      print('급여 지급 취소 오류: $e');
+      SnackbarHelper.showError('급여 지급 취소 중 오류가 발생했습니다.');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // ✅ 지급 상태가 변경되었는지 확인
+  bool hasPaymentStatusChanged() {
+    final currentStatus = paymentRecord.value != null;
+    return _paymentStatusChanged || (_initialPaymentStatus != currentStatus);
+  }
+
+  // 기존 메서드들...
   double getDayTotalHours(int day, int year, int month) {
     final targetDate = DateTime(year, month, day);
 
@@ -128,7 +211,6 @@ class SalaryController extends GetxController {
       return scheduleDate.isAtSameMomentAs(targetDate);
     }).toList();
 
-    // 시작 시간 기준 오름차순 정렬
     daySchedules.sort((a, b) => a.startTime.compareTo(b.startTime));
 
     return daySchedules;
@@ -140,7 +222,6 @@ class SalaryController extends GetxController {
 
   int getFirstDayOfWeek(int year, int month) {
     final firstDay = DateTime(year, month, 1);
-    // 일요일 기준 (0: 일요일, 1: 월요일, ..., 6: 토요일)
     return firstDay.weekday % 7;
   }
 

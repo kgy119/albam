@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../../app/theme/app_theme.dart';
 import '../../../core/utils/snackbar_helper.dart';
 import '../../controllers/monthly_salary_summary_controller.dart';
 import '../../../app/routes/app_routes.dart';
@@ -76,8 +77,6 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
                       return _buildEmployeeSalaryCard(
                         item,
                         currencyFormat,
-                        controller.year.value,
-                        controller.month.value,
                       );
                     },
                   ),
@@ -301,210 +300,221 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
     );
   }
 
-  Widget _buildEmployeeSalaryCard(
-      Map<String, dynamic> item,
-      NumberFormat currencyFormat,
-      int year,
-      int month,
-      ) {
-    final employee = item['employee'];
-    final salaryData = item['salaryData'] as Map<String, dynamic>;
-    final workDays = item['workDays'] as int;
+  Widget _buildEmployeeSalaryCard(Map<String, dynamic> employeeSalary, NumberFormat currencyFormat) {
+    final employee = employeeSalary['employee'];
+    final salaryData = employeeSalary['salaryData'];
+    final workDays = employeeSalary['workDays'];
+    final paymentRecord = employeeSalary['paymentRecord']; // ✅ 추가
 
-    // 주휴수당 시간
-    final weeklyHolidayHours = (salaryData['weeklyHolidayHours'] as num?)?.toDouble() ?? 0.0;
-    final hasWeeklyHoliday = weeklyHolidayHours > 0;
+    // ✅ 지급 완료 여부에 따른 스타일
+    final isPaid = paymentRecord != null;
+    final textColor = isPaid ? Colors.grey[600] : Colors.black;
+    final amountColor = isPaid ? Colors.grey[600] : AppTheme.primaryColor;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () {
-          // 상세 급여 페이지로 이동
-          Get.toNamed(
+        onTap: () async { // ✅ async 추가
+          final result = await Get.toNamed( // ✅ await 추가
             AppRoutes.salaryView,
             arguments: {
               'employee': employee,
-              'year': year,
-              'month': month,
+              'year': controller.year.value,
+              'month': controller.month.value,
             },
           );
+
+          // ✅ 지급 상태가 변경되었으면 새로고침
+          if (result == true) {
+            controller.loadMonthlySalaries();
+          }
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    backgroundColor: Theme.of(Get.context!).primaryColor.withOpacity(0.1),
-                    child: Text(
-                      employee.name.isNotEmpty ? employee.name[0] : '?',
-                      style: TextStyle(
-                        color: Theme.of(Get.context!).primaryColor,
-                        fontWeight: FontWeight.bold,
+                  // 아바타
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isPaid // ✅ 지급 완료 시 회색
+                            ? [Colors.grey[400]!, Colors.grey[300]!]
+                            : [AppTheme.primaryColor, AppTheme.primaryLightColor],
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        employee.name.isNotEmpty ? employee.name[0] : '?',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
+
+                  // 직원 정보
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          employee.name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                employee.name,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor, // ✅ 지급 완료 시 회색
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            // ✅ 지급 완료 표시
+                            if (isPaid) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.green[100],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.green[300]!),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle,
+                                      size: 12,
+                                      color: Colors.green[700],
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '지급완료',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green[700],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
+                        const SizedBox(height: 4),
                         Text(
-                          '시급 ${currencyFormat.format(employee.hourlyWage)}원',
+                          '근무 ${workDays}일 • ${salaryData['totalHours'].toStringAsFixed(1)}시간',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             color: Colors.grey[600],
                           ),
                         ),
+                        // ✅ 지급일시 표시
+                        if (isPaid) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '지급: ${DateFormat('MM/dd HH:mm').format(paymentRecord.paidAt)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.green[700],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '${currencyFormat.format(salaryData['netPay'])}원',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(Get.context!).primaryColor,
-                        ),
-                      ),
-                      Text(
-                        '실수령액',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[500],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.chevron_right, size: 20),
                 ],
               ),
 
-              // 계좌번호 정보
-              if (employee.bankName != null && employee.accountNumber != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue[100]!),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.account_balance,
-                        size: 16,
-                        color: Colors.blue[700],
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${employee.bankName} ${employee.accountNumber}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.blue[900],
-                          ),
-                        ),
-                      ),
-                      // 복사 버튼
-                      InkWell(
-                        onTap: () {
-                          Clipboard.setData(ClipboardData(text: employee.accountNumber!));
-                          SnackbarHelper.showCopied( // ✅ 수정
-                            '${employee.name}님의 계좌번호가 복사되었습니다.',
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(4),
-                        child: Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: Icon(
-                            Icons.copy,
-                            size: 16,
-                            color: Colors.blue[700],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
+              const SizedBox(height: 16),
+              const Divider(height: 1),
               const SizedBox(height: 12),
 
-              // 근무 정보 칩들
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              // 급여 상세
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildInfoChip(
-                    '${salaryData['totalHours'].toStringAsFixed(1)}시간',
-                    Icons.access_time,
-                    Colors.blue,
+                  Text(
+                    '기본급',
+                    style: TextStyle(fontSize: 13, color: textColor), // ✅ 회색
                   ),
-                  _buildInfoChip(
-                    '$workDays일',
-                    Icons.calendar_today,
-                    Colors.green,
+                  Text(
+                    '${currencyFormat.format(salaryData['basicPay'])}원',
+                    style: TextStyle(fontSize: 13, color: textColor), // ✅ 회색
                   ),
-                  if (salaryData['substituteHours'] > 0)
-                    _buildInfoChip(
-                      '대체 ${salaryData['substituteHours'].toStringAsFixed(1)}h',
-                      Icons.swap_horiz,
-                      Colors.orange,
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '주휴수당',
+                    style: TextStyle(fontSize: 13, color: textColor), // ✅ 회색
+                  ),
+                  Text(
+                    '${currencyFormat.format(salaryData['weeklyHolidayPay'])}원',
+                    style: TextStyle(fontSize: 13, color: textColor), // ✅ 회색
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '세금 (3.3%)',
+                    style: TextStyle(fontSize: 13, color: textColor), // ✅ 회색
+                  ),
+                  Text(
+                    '-${currencyFormat.format(salaryData['tax'])}원',
+                    style: TextStyle(fontSize: 13, color: textColor), // ✅ 회색
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+
+              // 실수령액
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '실수령액',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: textColor, // ✅ 회색
                     ),
-                  // 주휴수당 표시
-                  if (hasWeeklyHoliday)
-                    _buildInfoChip(
-                      '주휴 ${weeklyHolidayHours.toStringAsFixed(1)}h',
-                      Icons.card_giftcard,
-                      Colors.green,
+                  ),
+                  Text(
+                    '${currencyFormat.format(salaryData['netPay'])}원',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: amountColor, // ✅ 지급 완료 시 회색
                     ),
+                  ),
                 ],
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildInfoChip(String label, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       ),
     );
   }

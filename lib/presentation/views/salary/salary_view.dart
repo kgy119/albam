@@ -15,90 +15,100 @@ class SalaryView extends GetView<SalaryController> {
 
   @override
   Widget build(BuildContext context) {
-    final arguments = Get.arguments as Map<String, dynamic>;
-    final employee = arguments['employee'] as Employee;
-    final year = arguments['year'] as int;
-    final month = arguments['month'] as int;
+    // ✅ Controller에서 값 가져오기 (arguments 직접 읽지 않기)
+    final employee = controller.currentEmployee.value;
+    final year = controller.currentYear;
+    final month = controller.currentMonth;
+
+    if (employee == null || year == null || month == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('급여 정보')),
+        body: const Center(child: Text('잘못된 접근입니다.')),
+      );
+    }
 
     final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '');
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('${employee.name} - $year년 $month월 급여'),
-        actions: [
-          // 직원 정보 수정 버튼 추가
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () async {
-              final result = await Get.toNamed(
-                AppRoutes.editEmployee,
-                arguments: employee,
-              );
-
-              // 수정 완료 후 돌아왔을 때 급여 재계산
-              if (result == true) {
-                // 직원 정보가 변경되었으므로 급여 다시 계산
-                controller.calculateEmployeeSalary(
-                  employee: employee,
-                  year: year,
-                  month: month,
-                );
-              }
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          // ✅ hasPaymentStatusChanged() 사용
+          Get.back(result: controller.hasPaymentStatusChanged());
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('${employee.name} - $year년 $month월 급여'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              // ✅ hasPaymentStatusChanged() 사용
+              Get.back(result: controller.hasPaymentStatusChanged());
             },
-            tooltip: '직원 정보 수정',
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: Obx(() {
-          if (controller.isLoading.value) {
-            return const Center(child: CircularProgressIndicator());
-          }
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () async {
+                final result = await Get.toNamed(
+                  AppRoutes.editEmployee,
+                  arguments: employee,
+                );
 
-          final salaryData = controller.salaryData.value;
-          if (salaryData == null) {
-            return const Center(
-              child: Text('급여 정보가 없습니다.'),
+                // ✅ result가 true일 때만 재계산 (Employee 객체가 아님)
+                if (result == true) {
+                  controller.calculateEmployeeSalary(
+                    employee: employee,
+                    year: year,
+                    month: month,
+                  );
+                }
+              },
+              tooltip: '직원 정보 수정',
+            ),
+          ],
+        ),
+        body: SafeArea(
+          child: Obx(() {
+            if (controller.isLoading.value) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final salaryData = controller.salaryData.value;
+            if (salaryData == null) {
+              return const Center(
+                child: Text('급여 정보가 없습니다.'),
+              );
+            }
+
+            return SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                16 + MediaQuery.of(context).padding.bottom,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildEmployeeInfoCard(employee, currencyFormat),
+                  const SizedBox(height: 16),
+                  _buildCalendarCard(year, month, context),
+                  const SizedBox(height: 16),
+                  _buildWorkHoursCard(salaryData, context),
+                  const SizedBox(height: 16),
+                  _buildSalaryCard(salaryData, currencyFormat, context),
+                  const SizedBox(height: 16),
+                  if (salaryData['weeklyBreakdown'] != null)
+                    _buildWeeklyBreakdownCard(salaryData),
+                  const SizedBox(height: 16),
+                  _buildInfoBox(),
+                ],
+              ),
             );
-          }
-
-          return SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              16,
-              16,
-              16 + MediaQuery.of(context).padding.bottom,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 직원 정보 카드
-                _buildEmployeeInfoCard(employee, currencyFormat),
-                const SizedBox(height: 16),
-
-                // 달력 카드
-                _buildCalendarCard(year, month, context),
-                const SizedBox(height: 16),
-
-                // 근무 시간 카드
-                _buildWorkHoursCard(salaryData, context),
-                const SizedBox(height: 16),
-
-                // 급여 내역 카드
-                _buildSalaryCard(salaryData, currencyFormat, context),
-                const SizedBox(height: 16),
-
-                // 주별 근무 내역
-                if (salaryData['weeklyBreakdown'] != null)
-                  _buildWeeklyBreakdownCard(salaryData),
-                const SizedBox(height: 16),
-
-                // 안내 문구
-                _buildInfoBox(),
-              ],
-            ),
-          );
-        }),
+          }),
+        ),
       ),
     );
   }
@@ -129,9 +139,11 @@ class SalaryView extends GetView<SalaryController> {
                     );
 
                     if (result == true) {
-                      // 페이지 새로고침을 위해 Get.back 후 다시 진입
-                      SnackbarHelper.showWarning(
-                        '직원 정보가 수정되었습니다. 변경된 시급으로 다시 계산하려면 해당 월을 다시 조회해주세요.',
+                      // ✅ controller에서 year, month 가져오기
+                      await controller.calculateEmployeeSalary(
+                        employee: employee,
+                        year: controller.currentYear!,
+                        month: controller.currentMonth!,
                       );
                     }
                   },
@@ -178,17 +190,25 @@ class SalaryView extends GetView<SalaryController> {
             ),
             const SizedBox(height: 8),
             if (employee.bankName != null && employee.accountNumber != null) ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              const SizedBox(height: 8),
+              Column( // ✅ Row 대신 Column 사용
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('계좌번호'),
+                  const Text(
+                    '계좌번호',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   GestureDetector(
                     onTap: () {
                       Clipboard.setData(ClipboardData(text: employee.accountNumber!));
                       SnackbarHelper.showCopied('계좌번호가 클립보드에 복사되었습니다.');
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.blue[50],
                         borderRadius: BorderRadius.circular(4),
@@ -197,11 +217,14 @@ class SalaryView extends GetView<SalaryController> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            '${employee.bankName} ${employee.accountNumber}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue[700],
+                          Flexible( // ✅ Flexible로 감싸기
+                            child: Text(
+                              '${employee.bankName} ${employee.accountNumber}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue[700],
+                              ),
+                              overflow: TextOverflow.ellipsis, // ✅ 오버플로우 처리
                             ),
                           ),
                           const SizedBox(width: 4),
@@ -619,11 +642,7 @@ class SalaryView extends GetView<SalaryController> {
     );
   }
 
-  Widget _buildSalaryCard(
-      Map<String, dynamic> salaryData,
-      NumberFormat currencyFormat,
-      BuildContext context,
-      ) {
+  Widget _buildSalaryCard(Map<String, dynamic> salaryData, NumberFormat currencyFormat, BuildContext context) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -638,38 +657,163 @@ class SalaryView extends GetView<SalaryController> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildInfoRow(
-              '기본급',
-              '${currencyFormat.format(salaryData['basicPay'])}원',
-            ),
-            const SizedBox(height: 8),
-            _buildInfoRow(
-              '주휴수당',
-              '${currencyFormat.format(salaryData['weeklyHolidayPay'])}원',
-              valueColor: Colors.green,
-            ),
-            const Divider(height: 24, thickness: 1),
-            _buildInfoRow(
+
+            _buildSalaryRow('기본급', '${currencyFormat.format(salaryData['basicPay'])}원'),
+            const Divider(height: 20),
+            _buildSalaryRow('주휴수당', '${currencyFormat.format(salaryData['weeklyHolidayPay'])}원'),
+            const Divider(height: 20),
+            _buildSalaryRow(
               '총 급여',
               '${currencyFormat.format(salaryData['totalPay'])}원',
-              valueColor: Theme.of(context).primaryColor,
-              isBold: true,
-              fontSize: 16,
+              isTotal: true,
             ),
-            const SizedBox(height: 8),
-            _buildInfoRow(
+            const Divider(height: 20),
+            _buildSalaryRow(
               '세금 (3.3%)',
               '-${currencyFormat.format(salaryData['tax'])}원',
-              valueColor: Colors.red,
+              isNegative: true,
             ),
-            const Divider(height: 24, thickness: 2),
-            _buildInfoRow(
+            const Divider(height: 20),
+            _buildSalaryRow(
               '실수령액',
               '${currencyFormat.format(salaryData['netPay'])}원',
-              valueColor: Theme.of(context).primaryColor,
-              isBold: true,
-              fontSize: 18,
+              isFinal: true,
             ),
+
+            // ✅ 급여 지급 버튼 추가
+            const SizedBox(height: 24),
+            Obx(() {
+              final paymentRecord = controller.paymentRecord.value;
+
+              if (paymentRecord != null) {
+                // 지급 완료 상태
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.green[200]!),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.green[700], size: 28),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '지급 완료',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green[700],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '지급일시: ${DateFormat('yyyy-MM-dd HH:mm').format(paymentRecord.paidAt)}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                                Text(
+                                  '지급액: ${currencyFormat.format(paymentRecord.amount)}원',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (dialogContext) => AlertDialog(
+                                title: const Text('지급 취소'),
+                                content: const Text('급여 지급을 취소하시겠습니까?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(dialogContext).pop(),
+                                    child: const Text('아니오'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.of(dialogContext).pop();
+                                      controller.cancelPayment();
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                    ),
+                                    child: const Text('취소'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.cancel),
+                          label: const Text('지급 취소'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: BorderSide(color: Colors.red[300]!),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                // 지급 전 상태
+                return SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: controller.isLoading.value
+                        ? null
+                        : () {
+                      showDialog(
+                        context: context,
+                        builder: (dialogContext) => AlertDialog(
+                          title: const Text('급여 지급'),
+                          content: Text(
+                            '${currencyFormat.format(salaryData['netPay'])}원을 지급 처리하시겠습니까?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.of(dialogContext).pop(),
+                              child: const Text('취소'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(dialogContext).pop();
+                                controller.recordPayment();
+                              },
+                              child: const Text('지급'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.payment),
+                    label: const Text('급여 지급'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                );
+              }
+            }),
           ],
         ),
       ),
@@ -835,34 +979,6 @@ class SalaryView extends GetView<SalaryController> {
     );
   }
 
-  Widget _buildInfoRow(
-      String label,
-      String value, {
-        Color? valueColor,
-        bool isBold = false,
-        double? fontSize,
-      }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: fontSize ?? 14,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: fontSize ?? 14,
-            fontWeight: FontWeight.bold,
-            color: valueColor,
-          ),
-        ),
-      ],
-    );
-  }
 
   Future<void> _makePhoneCall(String phoneNumber) async {
     final cleanNumber = phoneNumber.replaceAll('-', '');
@@ -879,5 +995,59 @@ class SalaryView extends GetView<SalaryController> {
       Clipboard.setData(ClipboardData(text: phoneNumber));
       SnackbarHelper.showCopied('전화번호가 복사되었습니다.');
     }
+  }
+
+  Widget _buildSalaryRow(String label, String value, {bool isTotal = false, bool isNegative = false, bool isFinal = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: isFinal ? 16 : 14,
+            fontWeight: isFinal || isTotal ? FontWeight.bold : FontWeight.normal,
+            color: isNegative ? Colors.red[700] : (isFinal ? Colors.black : Colors.grey[700]),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: isFinal ? 18 : 14,
+            fontWeight: isFinal || isTotal ? FontWeight.bold : FontWeight.w500,
+            color: isNegative
+                ? Colors.red[700]
+                : (isFinal ? Theme.of(Get.context!).primaryColor : Colors.black87),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(
+      String label,
+      String value, {
+        Color? valueColor,
+        double? fontSize,
+      }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: fontSize ?? 14,
+            color: Colors.grey[700],
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: fontSize ?? 14,
+            color: valueColor ?? Colors.black87,
+          ),
+        ),
+      ],
+    );
   }
 }
