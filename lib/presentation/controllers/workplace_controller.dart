@@ -1,89 +1,169 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../core/services/connectivity_service.dart';
-import '../../core/utils/snackbar_helper.dart';
-import '../../data/models/workplace_model.dart';
 import '../../core/services/workplace_service.dart';
 import '../../core/services/employee_service.dart';
+import '../../core/services/subscription_limit_service.dart';
+import '../../core/utils/snackbar_helper.dart';
+import '../../data/models/workplace_model.dart';
 
 class WorkplaceController extends GetxController {
-  late final WorkplaceService _workplaceService;
-  late final EmployeeService _employeeService;
+  final WorkplaceService _workplaceService = WorkplaceService();
+  final EmployeeService _employeeService = EmployeeService();
+  final SubscriptionLimitService _limitService = SubscriptionLimitService();
 
-  // 사업장 목록
   RxList<Workplace> workplaces = <Workplace>[].obs;
-
-  // 로딩 상태
   RxBool isLoading = false.obs;
   RxBool isAdding = false.obs;
 
   @override
-  void onInit() {
-    super.onInit();
-
-    // 서비스 의존성 확인
-    try {
-      _workplaceService = Get.find<WorkplaceService>();
-      _employeeService = EmployeeService(); // 신규 생성
-      print('WorkplaceService 찾음');
-    } catch (e) {
-      print('WorkplaceService를 찾을 수 없음: $e');
-      return;
-    }
-
-    // 약간의 딜레이 후 사업장 목록 로드
-    Future.delayed(const Duration(milliseconds: 500), () {
-      loadWorkplaces();
-    });
+  void onReady() {
+    super.onReady();
+    loadWorkplaces();
   }
 
-  /// 사업장 목록 로드
   Future<void> loadWorkplaces() async {
+    isLoading.value = true;
+
     try {
-      print('사업장 목록 로드 시작');
-      isLoading.value = true;
-
-      final List<Workplace> loadedWorkplaces = await _workplaceService.getWorkplaces();
-      workplaces.value = loadedWorkplaces;
-
-      print('사업장 목록 로드 완료: ${workplaces.length}개');
+      workplaces.value = await _workplaceService.getWorkplaces();
+      print('사업장 로드 완료: ${workplaces.length}개');
 
       await loadAllEmployeeCounts();
-
-      if (workplaces.isEmpty) {
-        print('등록된 사업장이 없습니다.');
-      }
     } catch (e) {
-      print('사업장 목록 로드 실패: $e');
-      SnackbarHelper.showError(e.toString()); // 수정
+      print('사업장 로드 오류: $e');
+      SnackbarHelper.showError('사업장 목록을 불러오는데 실패했습니다.');
     } finally {
       isLoading.value = false;
     }
   }
 
-
+  /// 사업장 추가 (한도 체크 포함)
   Future<void> addWorkplace(String name) async {
-
-    // ✅ 인터넷 연결 확인
-    final connectivityService = Get.find<ConnectivityService>();
-    if (!connectivityService.isConnected.value) {
-      SnackbarHelper.showError('인터넷 연결이 필요합니다.');
-      return;
-    }
+    if (isAdding.value) return;
 
     try {
       isAdding.value = true;
 
-      final newWorkplace = await _workplaceService.addWorkplace(name);
+      // 1. 사업장 추가 가능 여부 확인
+      final canAdd = await _limitService.canAddWorkplace();
 
+      if (!canAdd) {
+        // 한도 초과 시 구독 안내 다이얼로그 표시
+        _showSubscriptionLimitDialog();
+        return;
+      }
+
+      // 2. 사업장 추가
+      final newWorkplace = await _workplaceService.addWorkplace(name);
       workplaces.insert(0, newWorkplace);
 
-      SnackbarHelper.showSuccess('사업장이 추가되었습니다.'); // 수정
+      await loadAllEmployeeCounts();
+
+      SnackbarHelper.showSuccess('사업장이 추가되었습니다.');
     } catch (e) {
       print('사업장 추가 오류: $e');
-      SnackbarHelper.showError(e.toString()); // 수정
+      SnackbarHelper.showError(e.toString());
     } finally {
       isAdding.value = false;
     }
+  }
+
+  /// 구독 한도 초과 다이얼로그
+  void _showSubscriptionLimitDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.workspace_premium, color: Colors.amber[700]),
+            const SizedBox(width: 8),
+            const Text('사업장 추가 제한'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '무료 회원은 최대 1개의 사업장만 등록할 수 있습니다.',
+              style: TextStyle(fontSize: 15),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.amber[700], size: 20),
+                      const SizedBox(width: 8),
+                      const Text(
+                        '프리미엄 혜택',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  _buildBenefitItem('사업장 최대 10개 등록'),
+                  _buildBenefitItem('사업장당 직원 20명까지'),
+                  _buildBenefitItem('무제한 근무 스케줄 관리'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '💰 월 5,900원',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.amber,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              Get.toNamed('/account-settings');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber[600],
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('프리미엄 구독하기'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBenefitItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8, bottom: 4),
+      child: Row(
+        children: [
+          Icon(Icons.check, color: Colors.amber[700], size: 16),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: const TextStyle(fontSize: 13),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 사업장 삭제
@@ -93,10 +173,10 @@ class WorkplaceController extends GetxController {
 
       workplaces.removeWhere((w) => w.id == workplaceId);
 
-      SnackbarHelper.showSuccess('사업장이 삭제되었습니다.'); // 수정
+      SnackbarHelper.showSuccess('사업장이 삭제되었습니다.');
     } catch (e) {
       print('사업장 삭제 오류: $e');
-      SnackbarHelper.showError(e.toString()); // 수정
+      SnackbarHelper.showError(e.toString());
     }
   }
 
@@ -113,10 +193,10 @@ class WorkplaceController extends GetxController {
         );
       }
 
-      SnackbarHelper.showSuccess('사업장 정보가 수정되었습니다.'); // 수정
+      SnackbarHelper.showSuccess('사업장 정보가 수정되었습니다.');
     } catch (e) {
       print('사업장 수정 오류: $e');
-      SnackbarHelper.showError(e.toString()); // 수정
+      SnackbarHelper.showError(e.toString());
     }
   }
 

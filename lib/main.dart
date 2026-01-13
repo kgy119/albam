@@ -11,6 +11,8 @@ import 'core/services/auth_service.dart';
 import 'core/services/connectivity_service.dart';
 import 'core/services/workplace_service.dart';
 import 'core/services/minimum_wage_service.dart';
+import 'core/services/subscription_service.dart';
+import 'core/services/subscription_limit_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,9 +22,9 @@ void main() async {
     url: SupabaseConfig.supabaseUrl,
     anonKey: SupabaseConfig.supabaseAnonKey,
     authOptions: const FlutterAuthClientOptions(
-      authFlowType: AuthFlowType.pkce, // ✅ PKCE 플로우 사용
+      authFlowType: AuthFlowType.pkce,
     ),
-    debug: true, // ✅ 디버그 로그 활성화
+    debug: true,
   );
 
   print('✅ Supabase 초기화 완료 (딥링크 처리 포함)');
@@ -42,6 +44,13 @@ void main() async {
 
   await Get.putAsync(() => MinimumWageService().init());
   print('✅ MinimumWageService 등록 완료');
+
+  // 구독 서비스 등록
+  await Get.putAsync(() => SubscriptionService().onInit());
+  print('✅ SubscriptionService 등록 완료');
+
+  Get.put(SubscriptionLimitService());
+  print('✅ SubscriptionLimitService 등록 완료');
 
   print('🚀 앱 시작');
 

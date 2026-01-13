@@ -12,6 +12,10 @@ class SupabaseConfig {
   static const String schedulesTable = 'schedules';
   static const String minimumWagesTable = 'minimum_wages';
 
+  // 구독 관련 테이블 추가
+  static const String subscriptionConfigTable = 'subscription_config';
+  static const String userSubscriptionsTable = 'user_subscriptions';
+
   // Storage 상수
   static const int maxImageSizeMB = 5;
   static const int maxImageSizeBytes = maxImageSizeMB * 1024 * 1024;
