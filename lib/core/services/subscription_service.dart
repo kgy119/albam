@@ -126,10 +126,14 @@ class SubscriptionService extends GetxService {
     }
   }
 
+  // lib/core/services/subscription_service.dart
+
   /// Supabase에 구매 정보 저장
   Future<void> _savePurchaseToSupabase(PurchaseDetails purchase) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
+      final userEmail = _supabase.auth.currentUser?.email;  // ✅ 추가
+
       if (userId == null) {
         print('❌ 사용자 ID 없음');
         return;
@@ -145,6 +149,7 @@ class SubscriptionService extends GetxService {
 
       final data = {
         'user_id': userId,
+        'email': userEmail,  // ✅ 추가
         'tier': 'premium',
         'subscription_status': 'active',
         'purchase_token': purchaseToken,
@@ -158,9 +163,9 @@ class SubscriptionService extends GetxService {
           .from(SupabaseConfig.userSubscriptionsTable)
           .upsert(data, onConflict: 'user_id');
 
-      print('✅ 구독 정보 저장 완료');
+      print('✅ 구독 정보 저장 완료 (이메일: $userEmail)');
 
-      // ✅ 저장 완료 후 이벤트 전송
+      // 저장 완료 후 이벤트 전송
       Get.find<SubscriptionLimitService>().getUserSubscriptionLimits();
     } catch (e) {
       print('❌ 구독 정보 저장 오류: $e');
@@ -204,6 +209,7 @@ class SubscriptionService extends GetxService {
             .update({
           'tier': 'free',
           'subscription_status': 'expired',
+          'email': _supabase.auth.currentUser?.email,  // ✅ 이메일 유지
           'updated_at': DateTime.now().toIso8601String(),
         })
             .eq('user_id', userId);

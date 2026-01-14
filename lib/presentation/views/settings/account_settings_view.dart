@@ -641,18 +641,15 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
         Navigator.of(Get.overlayContext!).pop();
       }
 
-      await Future.delayed(const Duration(milliseconds: 300));
+      print('✅ 구독 처리 완료 - 결과: $success');
 
-      if (success) {
-        print('✅ 구매 요청 성공');
+      // ✅ 구독 창이 닫힌 후 여기로 돌아옴
+      // 1초 대기 후 새로고침 (구독 처리 시간 고려)
+      await Future.delayed(const Duration(seconds: 1));
 
-        // Google Play 결제 화면으로 이동한 상태
-        // 결제 완료 후 앱으로 돌아오면 자동 감지됨
+      print('🔄 구독 상태 확인 중...');
+      await _refreshSubscriptionStatus();
 
-      } else {
-        print('❌ 구매 요청 실패');
-        SnackbarHelper.showError('구독 요청에 실패했습니다.');
-      }
     } catch (e) {
       print('❌ 오류: $e');
 
@@ -662,6 +659,42 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
       }
 
       SnackbarHelper.showError('오류가 발생했습니다.');
+    }
+  }
+
+// ✅ 구독 상태 새로고침 메서드 추가
+  Future<void> _refreshSubscriptionStatus() async {
+    try {
+      setState(() {
+        isLoadingLimits = true;
+      });
+
+      // 1. SubscriptionService 새로고침
+      await subscriptionService.loadCurrentSubscription();
+
+      // 2. SubscriptionLimitService 새로고침
+      final limits = await limitService.getUserSubscriptionLimits();
+
+      setState(() {
+        subscriptionLimits = limits;
+        isLoadingLimits = false;
+      });
+
+      print('✅ 새로고침 완료');
+      print('   tier: ${subscriptionLimits?.tier}');
+      print('   isPremium: ${subscriptionLimits?.isPremium}');
+
+      // ✅ 프리미엄으로 변경되었으면 성공 메시지
+      if (subscriptionLimits?.isPremium == true) {
+        SnackbarHelper.showSuccess(
+          '🎉 프리미엄 구독이 완료되었습니다!\n모든 기능을 이용할 수 있습니다.',
+        );
+      }
+    } catch (e) {
+      print('❌ 새로고침 오류: $e');
+      setState(() {
+        isLoadingLimits = false;
+      });
     }
   }
 
@@ -893,7 +926,7 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        child: Text('$storeName 열기'),
+                        child: Text('$storeName'),
                       ),
                     ),
                   ],

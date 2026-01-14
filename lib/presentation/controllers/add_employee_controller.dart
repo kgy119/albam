@@ -236,6 +236,8 @@ class AddEmployeeController extends GetxController {
     }
   }
 
+  // lib/presentation/controllers/add_employee_controller.dart
+
   /// 직원 추가 한도 초과 다이얼로그
   void _showEmployeeLimitDialog(Map<String, dynamic> checkResult) {
     final currentCount = checkResult['current_count'] as int;
@@ -251,75 +253,77 @@ class AddEmployeeController extends GetxController {
             const Text('직원 추가 제한'),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              tier == 'free'
-                  ? '무료 회원은 사업장당 최대 3명의 직원만 등록할 수 있습니다.'
-                  : '사업장당 직원 등록 한도($maxEmployees명)에 도달했습니다.',
-              style: const TextStyle(fontSize: 15),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
+        content: SingleChildScrollView(  // ✅ 추가
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                tier == 'free'
+                    ? '무료 회원은 사업장당 최대 3명의 직원만 등록할 수 있습니다.'
+                    : '사업장당 직원 등록 한도($maxEmployees명)에 도달했습니다.',
+                style: const TextStyle(fontSize: 15),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    '현재 등록된 직원',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  Text(
-                    '$currentCount / $maxEmployees명',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red[700],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (tier == 'free') ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.amber[50],
+                  color: Colors.grey[100],
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.amber[200]!),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Icon(Icons.check_circle, color: Colors.amber[700], size: 20),
-                        const SizedBox(width: 8),
-                        const Text(
-                          '프리미엄 혜택',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
+                    const Text(
+                      '현재 등록된 직원',
+                      style: TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    const SizedBox(height: 8),
-                    _buildBenefitItem('사업장 최대 10개'),
-                    _buildBenefitItem('사업장당 직원 20명까지'),
-                    _buildBenefitItem('무제한 근무 스케줄 관리'),
+                    Text(
+                      '$currentCount / $maxEmployees명',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red[700],
+                      ),
+                    ),
                   ],
                 ),
               ),
+              if (tier == 'free') ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber[200]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.amber[700], size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '프리미엄 혜택',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _buildBenefitItem('사업장 최대 10개'),
+                      _buildBenefitItem('사업장당 직원 20명까지'),
+                      _buildBenefitItem('무제한 근무 스케줄 관리'),
+                    ],
+                  ),
+                ),
+              ],
             ],
-          ],
-        ),
+          ),
+        ),  // ✅ SingleChildScrollView 닫기
         actions: [
           TextButton(
             onPressed: () => Get.back(),
