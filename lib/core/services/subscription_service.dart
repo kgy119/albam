@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:albam/core/services/subscription_limit_service.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../config/supabase_config.dart';
 import '../../data/models/user_subscription_model.dart';
 
@@ -80,8 +84,39 @@ class SubscriptionService extends GetxService {
 
         // 구독 정보 새로고침
         await loadCurrentSubscription();
+
+        // ✅ 성공 알림 추가
+        Get.snackbar(
+          '구독 완료',
+          '프리미엄 회원이 되었습니다!',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
       } else if (purchase.status == PurchaseStatus.error) {
         print('❌ 구매 오류: ${purchase.error}');
+
+        // ✅ 오류 알림 추가
+        Get.snackbar(
+          '구독 실패',
+          '구독에 실패했습니다. 다시 시도해주세요.',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+      } else if (purchase.status == PurchaseStatus.canceled) {
+        print('❌ 구매 취소됨');
+
+        Get.snackbar(
+          '구독 취소',
+          '구독이 취소되었습니다.',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
       }
 
       // 구매 완료 처리
@@ -105,7 +140,6 @@ class SubscriptionService extends GetxService {
         purchaseToken = purchase.billingClientPurchase.purchaseToken;
       }
 
-      // 구독 시작일과 종료일 계산 (월 단위)
       final now = DateTime.now();
       final endDate = DateTime(now.year, now.month + 1, now.day);
 
@@ -120,12 +154,14 @@ class SubscriptionService extends GetxService {
         'auto_renew': true,
       };
 
-      // UPSERT: 존재하면 업데이트, 없으면 삽입
       await _supabase
           .from(SupabaseConfig.userSubscriptionsTable)
           .upsert(data, onConflict: 'user_id');
 
       print('✅ 구독 정보 저장 완료');
+
+      // ✅ 저장 완료 후 이벤트 전송
+      Get.find<SubscriptionLimitService>().getUserSubscriptionLimits();
     } catch (e) {
       print('❌ 구독 정보 저장 오류: $e');
     }
@@ -154,12 +190,35 @@ class SubscriptionService extends GetxService {
       }
 
       currentSubscription.value = UserSubscription.fromJson(response);
+
+      // ✅ 만료 확인 및 자동 무료 전환
+      if (currentSubscription.value != null &&
+          !currentSubscription.value!.isActive &&
+          currentSubscription.value!.tier == 'premium') {
+
+        print('⚠️ 구독이 만료되었습니다. 무료로 전환합니다.');
+
+        // 무료로 전환
+        await _supabase
+            .from(SupabaseConfig.userSubscriptionsTable)
+            .update({
+          'tier': 'free',
+          'subscription_status': 'expired',
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+            .eq('user_id', userId);
+
+        // 구독 정보 재로드
+        await loadCurrentSubscription();
+      }
+
       print('✅ 구독 정보 로드 완료: ${currentSubscription.value?.tier}');
     } catch (e) {
       print('❌ 구독 정보 로드 오류: $e');
       currentSubscription.value = null;
     }
   }
+
 
   /// 구독 상품 정보 가져오기
   Future<ProductDetails?> getSubscriptionProduct() async {
@@ -237,10 +296,64 @@ class SubscriptionService extends GetxService {
 
   /// 구독 취소 (Google Play Console로 리다이렉트)
   Future<void> manageSubscription() async {
-    // Google Play 구독 관리 페이지로 이동
-    // 실제 구현은 url_launcher를 사용하여 처리
-    print('📱 Google Play 구독 관리 페이지로 이동');
+    try {
+      print('📱 구독 관리 페이지 열기 시도');
+
+      // Android: Google Play 구독 센터
+      final androidUrl = Uri.parse(
+          'https://play.google.com/store/account/subscriptions?package=com.albamanage.albam&sku=premium_monthly_subscription'
+      );
+
+      // iOS: App Store 구독 관리 (향후 지원)
+      final iosUrl = Uri.parse('https://apps.apple.com/account/subscriptions');
+
+      // 플랫폼별 URL 선택
+      final url = Platform.isAndroid ? androidUrl : iosUrl;
+
+      if (await canLaunchUrl(url)) {
+        final launched = await launchUrl(
+          url,
+          mode: LaunchMode.externalApplication,
+        );
+
+        if (launched) {
+          print('✅ 구독 관리 페이지 열기 성공');
+        } else {
+          print('❌ 구독 관리 페이지 열기 실패');
+          _showManageSubscriptionError();
+        }
+      } else {
+        print('❌ URL을 열 수 없음: $url');
+        _showManageSubscriptionError();
+      }
+    } catch (e) {
+      print('❌ 구독 관리 오류: $e');
+      _showManageSubscriptionError();
+    }
   }
+
+  /// 구독 관리 오류 메시지
+  void _showManageSubscriptionError() {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('구독 관리'),
+        content: const Text(
+            'Google Play 스토어 앱에서 직접 구독을 관리할 수 있습니다.\n\n'
+                '1. Google Play 스토어 앱 열기\n'
+                '2. 프로필 아이콘 탭\n'
+                '3. "결제 및 정기결제" 선택\n'
+                '4. "정기결제" 탭에서 알밤 찾기'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   /// 프리미엄 사용자 여부
   bool get isPremiumUser {

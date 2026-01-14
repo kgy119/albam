@@ -5,10 +5,37 @@ import '../../../app/theme/app_theme.dart';
 import '../../controllers/workplace_controller.dart';
 import '../../widgets/add_workplace_dialog.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/services/subscription_limit_service.dart';
+import '../../../data/models/subscription_limits_model.dart';
 import '../../../app/routes/app_routes.dart';
 
-class HomeView extends GetView<WorkplaceController> {
+class HomeView extends StatefulWidget {
   const HomeView({super.key});
+
+  @override
+  State<HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<HomeView> {
+  final WorkplaceController controller = Get.find<WorkplaceController>();
+  final SubscriptionLimitService _limitService = Get.put(SubscriptionLimitService());
+
+  SubscriptionLimits? subscriptionLimits;
+  bool isLoadingLimits = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSubscriptionLimits();
+  }
+
+  Future<void> _loadSubscriptionLimits() async {
+    final limits = await _limitService.getUserSubscriptionLimits();
+    setState(() {
+      subscriptionLimits = limits;
+      isLoadingLimits = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,16 +47,23 @@ class HomeView extends GetView<WorkplaceController> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () => Get.toNamed(AppRoutes.accountSettings),
+            onPressed: () async {
+              await Get.toNamed(AppRoutes.accountSettings);
+              // 설정 화면에서 돌아오면 구독 정보 새로고침
+              _loadSubscriptionLimits();
+            },
             tooltip: '설정',
           ),
         ],
       ),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: controller.loadWorkplaces,
+          onRefresh: () async {
+            await controller.loadWorkplaces();
+            await _loadSubscriptionLimits();
+          },
           child: Obx(() {
-            if (controller.isLoading.value) {
+            if (controller.isLoading.value || isLoadingLimits) {
               return const Center(child: CircularProgressIndicator());
             }
 
@@ -45,40 +79,6 @@ class HomeView extends GetView<WorkplaceController> {
         onPressed: () => _showAddWorkplaceDialog(),
         child: const Icon(Icons.add),
       ),
-    );
-  }
-
-  void _showLogoutDialog(AuthService authService) {
-    showDialog(
-      context: Get.context!,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('로그아웃'),
-          content: const Text('로그아웃 하시겠습니까?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-              child: const Text('취소'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.of(dialogContext).pop(); // 다이얼로그 먼저 닫기
-
-                await Future.delayed(const Duration(milliseconds: 200));
-
-                await authService.signOut();
-
-                // 로그인 화면으로 이동
-                Get.offAllNamed(AppRoutes.login);
-              },
-              child: const Text('확인'),
-            ),
-          ],
-        );
-      },
     );
   }
 
@@ -119,136 +119,188 @@ class HomeView extends GetView<WorkplaceController> {
       itemCount: controller.workplaces.length,
       itemBuilder: (context, index) {
         final workplace = controller.workplaces[index];
-        return _buildWorkplaceCard(workplace, context);
+        return _buildWorkplaceCard(workplace, index, context);
       },
     );
   }
 
-  // _buildWorkplaceCard 메서드 수정
-  // _buildWorkplaceCard 메서드에서 IconButton 부분 수정
+  Widget _buildWorkplaceCard(workplace, int index, BuildContext context) {
+    final isPremium = subscriptionLimits?.isPremium ?? false;
+    final isLocked = !isPremium && index >= 1; // 무료는 첫 번째만 활성
 
-  Widget _buildWorkplaceCard(workplace, BuildContext context) {
     return Card(
-      child: InkWell(
-        onTap: () {
-          Get.toNamed(AppRoutes.workplaceDetail, arguments: workplace);
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Stack(
+        children: [
+          InkWell(
+            onTap: isLocked ? () => _showUpgradeDialog() : () {
+              Get.toNamed(AppRoutes.workplaceDetail, arguments: workplace);
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 아이콘 박스
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Theme.of(context).primaryColor,
-                          Theme.of(context).primaryColor.withOpacity(0.7),
-                        ],
+                  Row(
+                    children: [
+                      // 아이콘 박스
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Theme.of(context).primaryColor,
+                              Theme.of(context).primaryColor.withOpacity(0.7),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.store,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                       ),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.store,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          workplace.name,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.5,
-                          ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              workplace.name,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              DateFormat('yyyy.MM.dd 등록').format(workplace.createdAt),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          DateFormat('yyyy.MM.dd 등록').format(workplace.createdAt),
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
 
-                  // ✅ PopupMenuButton으로 변경
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    onSelected: (value) => _handleMenuSelection(value, workplace.id),
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit, size: 18),
-                            SizedBox(width: 10),
-                            Text('이름 수정'),
+                      // PopupMenuButton (잠금 상태에서는 비활성화)
+                      if (!isLocked)
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          onSelected: (value) => _handleMenuSelection(value, workplace.id),
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit, size: 18),
+                                  SizedBox(width: 10),
+                                  Text('이름 수정'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete, color: Colors.red, size: 18),
+                                  SizedBox(width: 10),
+                                  Text('삭제', style: TextStyle(color: Colors.red)),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, color: Colors.red, size: 18),
-                            SizedBox(width: 10),
-                            Text('삭제', style: TextStyle(color: Colors.red)),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
+
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 16),
+
+                  // 통계 정보
+                  Obx(() => Row(
+                    children: [
+                      _buildStatChip(
+                        icon: Icons.people_outline,
+                        label: '직원',
+                        value: '${controller.getEmployeeCount(workplace.id)}명',
+                        color: Theme.of(context).primaryColor,
+                      ),
+                      const SizedBox(width: 12),
+                      _buildStatChip(
+                        icon: Icons.calendar_today_outlined,
+                        label: '이번 달',
+                        value: '관리중',
+                        color: AppTheme.successColor,
+                      ),
+                    ],
+                  )),
                 ],
               ),
-
-              const SizedBox(height: 16),
-              const Divider(height: 1),
-              const SizedBox(height: 16),
-
-              // 통계 정보
-              Obx(() => Row(
-                children: [
-                  _buildStatChip(
-                    icon: Icons.people_outline,
-                    label: '직원',
-                    value: '${controller.getEmployeeCount(workplace.id)}명',
-                    color: Theme.of(context).primaryColor,
-                  ),
-                  const SizedBox(width: 12),
-                  _buildStatChip(
-                    icon: Icons.calendar_today_outlined,
-                    label: '이번 달',
-                    value: '관리중',
-                    color: AppTheme.successColor,
-                  ),
-                ],
-              )),
-            ],
+            ),
           ),
-        ),
+
+          // 잠금 오버레이
+          if (isLocked)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.75),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _showUpgradeDialog,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.lock,
+                            color: Colors.white,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            '프리미엄 구독 필요',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '탭하여 구독하기',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.8),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 
-// _handleMenuSelection 메서드 (이미 있음, 확인용)
   void _handleMenuSelection(String value, String workplaceId) {
     switch (value) {
       case 'edit':
@@ -260,13 +312,12 @@ class HomeView extends GetView<WorkplaceController> {
     }
   }
 
-// _showEditWorkplaceDialog 메서드 (이미 있음)
   void _showEditWorkplaceDialog(String workplaceId) {
     final workplace = controller.workplaces.firstWhere((w) => w.id == workplaceId);
     final TextEditingController nameController = TextEditingController(text: workplace.name);
 
     showDialog(
-      context: Get.context!,
+      context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
@@ -300,12 +351,11 @@ class HomeView extends GetView<WorkplaceController> {
     );
   }
 
-// _showDeleteConfirmDialog 메서드 (이미 있음)
   void _showDeleteConfirmDialog(String workplaceId) {
     final workplace = controller.workplaces.firstWhere((w) => w.id == workplaceId);
 
     showDialog(
-      context: Get.context!,
+      context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
@@ -381,8 +431,96 @@ class HomeView extends GetView<WorkplaceController> {
     );
   }
 
-
   void _showAddWorkplaceDialog() {
     Get.dialog(AddWorkplaceDialog());
+  }
+
+  // 업그레이드 다이얼로그
+  void _showUpgradeDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.workspace_premium, color: Colors.amber[700]),
+            const SizedBox(width: 8),
+            const Text('프리미엄 구독 필요'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '이 사업장은 프리미엄 구독이 필요합니다.',
+              style: TextStyle(fontSize: 15),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.amber[700], size: 20),
+                      const SizedBox(width: 8),
+                      const Text(
+                        '프리미엄 혜택',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  _buildBenefitItem('사업장 무제한 개설'),
+                  _buildBenefitItem('직원 무제한 등록'),
+                  _buildBenefitItem('광고 제거'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              Get.toNamed(AppRoutes.accountSettings);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber[600],
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('구독하기'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBenefitItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8, bottom: 4),
+      child: Row(
+        children: [
+          Icon(Icons.check, color: Colors.amber[700], size: 16),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: const TextStyle(fontSize: 13),
+          ),
+        ],
+      ),
+    );
   }
 }

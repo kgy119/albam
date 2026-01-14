@@ -118,15 +118,6 @@ class WorkplaceController extends GetxController {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            const Text(
-              '💰 월 5,900원',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.amber,
-              ),
-            ),
           ],
         ),
         actions: [

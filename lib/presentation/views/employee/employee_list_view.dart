@@ -2,47 +2,60 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../controllers/workplace_detail_controller.dart';
 import '../../../app/routes/app_routes.dart';
-import 'package:intl/intl.dart';
-import '../../../core/utils/snackbar_helper.dart'; // ✅ 추가
+import '../../../core/utils/snackbar_helper.dart';
+import '../../../core/services/subscription_limit_service.dart';
+import '../../../data/models/subscription_limits_model.dart';
 
 class EmployeeListView extends GetView<WorkplaceDetailController> {
   const EmployeeListView({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final limitService = Get.put(SubscriptionLimitService());
+
     return Scaffold(
       appBar: AppBar(
         title: Text('${controller.workplace.name} 직원 관리'),
       ),
       body: SafeArea(
-        child: Obx(() {
-          if (controller.isLoadingEmployees.value) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
+        child: FutureBuilder<SubscriptionLimits?>(
+          future: limitService.getUserSubscriptionLimits(),
+          builder: (context, snapshot) {
+            final subscriptionLimits = snapshot.data;
+            final isPremium = subscriptionLimits?.isPremium ?? false;
 
-          if (controller.employees.isEmpty) {
-            return _buildEmptyState();
-          }
+            return Obx(() {
+              if (controller.isLoadingEmployees.value) {
+                return const Center(
+                  child: CircularProgressIndicator(),
+                );
+              }
 
-          return ListView.builder(
-            padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                MediaQuery.of(context).padding.bottom
-            ),
-            itemCount: controller.employees.length,
-            itemBuilder: (context, index) {
-              final employee = controller.employees[index];
-              return _buildEmployeeCard(employee);
-            },
-          );
-        }),
+              if (controller.employees.isEmpty) {
+                return _buildEmptyState();
+              }
+
+              return ListView.builder(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  MediaQuery.of(context).padding.bottom + 80,
+                ),
+                itemCount: controller.employees.length,
+                itemBuilder: (context, index) {
+                  final employee = controller.employees[index];
+                  final isLocked = !isPremium && index >= 3; // 무료는 3명까지
+                  return _buildEmployeeCard(employee, isLocked);
+                },
+              );
+            });
+          },
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
@@ -55,10 +68,7 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
           );
 
           if (result != null && result['success'] == true) {
-            print('직원 추가 성공 - 목록 새로고침 및 스낵바 표시');
-
             await controller.loadEmployees();
-
             SnackbarHelper.showSuccess(
               '${result['employeeName']} 직원이 성공적으로 등록되었습니다.',
             );
@@ -100,242 +110,297 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
     );
   }
 
-  Widget _buildEmployeeCard(employee) {
+  Widget _buildEmployeeCard(employee, bool isLocked) {
     final currencyFormatter = NumberFormat.currency(locale: 'ko_KR', symbol: '');
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 아바타
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppTheme.primaryColor,
-                    AppTheme.primaryLightColor,
-                  ],
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  employee.name.isNotEmpty ? employee.name[0] : '?',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 20,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 14),
-
-            // 정보 영역 (Expanded로 남은 공간 차지)
-            Expanded(
-              child: Column(
+      child: Stack(
+        children: [
+          InkWell(
+            onTap: isLocked ? null : () {
+              Get.toNamed(
+                AppRoutes.editEmployee,
+                arguments: {
+                  'employee': employee,
+                  'workplace': controller.workplace,
+                },
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 첫 번째 줄: 직원이름
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          employee.name,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.3,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
+                  // 아바타
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.primaryColor,
+                          AppTheme.primaryLightColor,
+                        ],
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        employee.name.isNotEmpty ? employee.name[0] : '?',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 20,
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(width: 14),
 
-                  // 두 번째 줄: 시급, 근로계약서
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '시급 ${currencyFormatter.format(employee.hourlyWage)}원',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.primaryColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      if (employee.contractImageUrl != null) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppTheme.successColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.description,
-                                size: 11,
-                                color: AppTheme.successColor,
+                  // 정보 영역
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 이름
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                employee.name,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.3,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
-                              const SizedBox(width: 3),
-                              Text(
-                                '계약서',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+
+                        // 시급, 근로계약서
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '시급 ${currencyFormatter.format(employee.hourlyWage)}원',
                                 style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppTheme.successColor,
+                                  fontSize: 12,
+                                  color: AppTheme.primaryColor,
                                   fontWeight: FontWeight.w600,
                                 ),
+                              ),
+                            ),
+                            if (employee.contractImageUrl != null) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.successColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.description,
+                                      size: 11,
+                                      color: AppTheme.successColor,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      '계약서',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppTheme.successColor,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+
+                        // 전화번호
+                        InkWell(
+                          onTap: isLocked ? null : () => _makePhoneCall(employee.phoneNumber),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.phone_outlined,
+                                size: 13,
+                                color: Colors.grey[600],
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  employee.phoneNumber,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.call,
+                                size: 12,
+                                color: AppTheme.primaryColor,
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 6),
 
-                  // 세 번째 줄: 전화번호
-                  InkWell(
-                    onTap: () => _makePhoneCall(employee.phoneNumber),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.phone_outlined,
-                          size: 13,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            employee.phoneNumber,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w500,
+                        // 계좌번호
+                        if (employee.bankName != null && employee.accountNumber != null) ...[
+                          const SizedBox(height: 4),
+                          InkWell(
+                            onTap: isLocked ? null : () {
+                              Clipboard.setData(ClipboardData(text: employee.accountNumber!));
+                              SnackbarHelper.showCopied('계좌번호가 복사되었습니다.');
+                            },
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.account_balance,
+                                  size: 13,
+                                  color: Colors.grey[600],
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    '${employee.bankName} ${employee.accountNumber}',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.copy,
+                                  size: 12,
+                                  color: AppTheme.primaryColor,
+                                ),
+                              ],
                             ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(
-                          Icons.call,
-                          size: 12,
-                          color: AppTheme.primaryColor,
-                        ),
+                        ],
                       ],
                     ),
                   ),
 
-                  // 네 번째 줄: 계좌번호 (있는 경우)
-                  if (employee.bankName != null && employee.accountNumber != null) ...[
-                    const SizedBox(height: 4),
-                    InkWell(
-                      onTap: () {
-                        Clipboard.setData(ClipboardData(text: employee.accountNumber!));
-                        SnackbarHelper.showCopied('계좌번호가 복사되었습니다.');
+                  // 팝업 메뉴 (잠금 상태가 아닐 때만)
+                  if (!isLocked)
+                    PopupMenuButton(
+                      icon: const Icon(Icons.more_horiz),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      onSelected: (value) {
+                        if (value == 'edit') {
+                          _showEditDialog(employee);
+                        } else if (value == 'delete') {
+                          _showDeleteDialog(employee);
+                        } else if (value == 'salary') {
+                          _showSalaryDialog(employee);
+                        }
                       },
-                      child: Row(
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_outlined, size: 18),
+                              SizedBox(width: 10),
+                              Text('정보 수정'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'salary',
+                          child: Row(
+                            children: [
+                              Icon(Icons.account_balance_wallet_outlined, size: 18),
+                              SizedBox(width: 10),
+                              Text('급여 조회'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                              SizedBox(width: 10),
+                              Text('삭제', style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          ),
+
+          // 잠금 오버레이
+          if (isLocked)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.75),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _showUpgradeDialog(),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.account_balance,
-                            size: 13,
-                            color: Colors.grey[600],
+                            Icons.lock,
+                            color: Colors.white,
+                            size: 36,
                           ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              '${employee.bankName} ${employee.accountNumber}',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
+                          const SizedBox(height: 8),
+                          const Text(
+                            '프리미엄 구독 필요',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
                             ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.copy,
-                            size: 12,
-                            color: AppTheme.primaryColor,
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ],
+                  ),
+                ),
               ),
             ),
-
-            // 팝업 메뉴
-            PopupMenuButton(
-              icon: const Icon(Icons.more_horiz),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              onSelected: (value) {
-                if (value == 'edit') {
-                  _showEditDialog(employee);
-                } else if (value == 'delete') {
-                  _showDeleteDialog(employee);
-                } else if (value == 'salary') {
-                  _showSalaryDialog(employee);
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit_outlined, size: 18),
-                      SizedBox(width: 10),
-                      Text('정보 수정'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'salary',
-                  child: Row(
-                    children: [
-                      Icon(Icons.account_balance_wallet_outlined, size: 18),
-                      SizedBox(width: 10),
-                      Text('급여 조회'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                      SizedBox(width: 10),
-                      Text('삭제', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -357,37 +422,34 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
 
   void _copyPhoneNumber(String phoneNumber) {
     Clipboard.setData(ClipboardData(text: phoneNumber));
-    SnackbarHelper.showCopied('전화번호가 복사되었습니다.'); // ✅ 수정
+    SnackbarHelper.showCopied('전화번호가 복사되었습니다.');
   }
 
   void _showDeleteDialog(employee) {
     Get.dialog(
-      AlertDialog(
-        title: const Text('직원 삭제'),
-        content: Text('${employee.name} 직원을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.'),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Get.back();
-              await controller.deleteEmployee(employee.id);
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
+        AlertDialog(
+            title: const Text('직원 삭제'),
+            content: Text('${employee.name} 직원을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.'),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Get.back();
+                await controller.deleteEmployee(employee.id);
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('삭제'),
+            ),
+          ],
+        ),
     );
-  }
-
-  void _showEditDialog(employee) async {
+  }void _showEditDialog(employee) async {
     final latestEmployee = await controller.getLatestEmployeeInfo(employee.id);
-
     if (latestEmployee == null) {
-      SnackbarHelper.showError('직원 정보를 불러올 수 없습니다.'); // ✅ 수정
+      SnackbarHelper.showError('직원 정보를 불러올 수 없습니다.');
       return;
     }
 
@@ -400,12 +462,10 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
       await controller.loadEmployees();
     }
   }
-
   void _showSalaryDialog(employee) {
     final now = DateTime.now();
     int selectedYear = now.year;
     int selectedMonth = now.month;
-
     Get.dialog(
       AlertDialog(
         title: Text('${employee.name} 급여 조회'),
@@ -430,7 +490,6 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
               },
             ),
             const SizedBox(height: 16),
-
             DropdownButtonFormField<int>(
               decoration: const InputDecoration(
                 labelText: '월',
@@ -468,6 +527,51 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
               );
             },
             child: const Text('조회'),
+          ),
+        ],
+      ),
+    );
+  }
+  void _showUpgradeDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.workspace_premium, color: Colors.amber[700]),
+            const SizedBox(width: 8),
+            const Text('프리미엄 구독 필요'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '이 직원은 프리미엄 구독이 필요합니다.',
+              style: TextStyle(fontSize: 15),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '무료 회원은 최대 3명의 직원만 활성화할 수 있습니다.',
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              Get.toNamed(AppRoutes.accountSettings);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber[600],
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('구독하기'),
           ),
         ],
       ),

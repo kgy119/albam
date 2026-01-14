@@ -2,7 +2,7 @@ name: albam
 description: 알바관리 - 아르바이트 관리 서비스
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.9.0
@@ -22,6 +22,8 @@ dependencies:
   package_info_plus: ^9.0.0
   connectivity_plus: ^7.0.0
   photo_view: ^0.15.0
+
+  #인앱결제
   in_app_purchase: ^3.2.3
   in_app_purchase_android: ^0.4.0+8
   in_app_purchase_storekit: ^0.4.7
