@@ -5,6 +5,7 @@ class UserSubscription {
   final String subscriptionStatus; // 'active', 'cancelled', 'expired'
   final String? purchaseToken;
   final String? productId;
+  final String? platform;
   final DateTime? subscriptionStartDate;
   final DateTime? subscriptionEndDate;
   final bool autoRenew;
@@ -18,6 +19,7 @@ class UserSubscription {
     required this.subscriptionStatus,
     this.purchaseToken,
     this.productId,
+    this.platform,
     this.subscriptionStartDate,
     this.subscriptionEndDate,
     required this.autoRenew,
@@ -33,6 +35,7 @@ class UserSubscription {
       subscriptionStatus: json['subscription_status'] as String,
       purchaseToken: json['purchase_token'] as String?,
       productId: json['product_id'] as String?,
+      platform: json['platform'],
       subscriptionStartDate: json['subscription_start_date'] != null
           ? DateTime.parse(json['subscription_start_date'] as String)
           : null,
@@ -68,4 +71,8 @@ class UserSubscription {
   }
 
   bool get isPremium => tier == 'premium' && isActive;
+
+  // ✅ 플랫폼 확인 헬퍼
+  bool get isIOSSubscription => platform == 'ios';
+  bool get isAndroidSubscription => platform == 'android';
 }

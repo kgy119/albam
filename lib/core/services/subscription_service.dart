@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../config/supabase_config.dart';
 import '../../data/models/user_subscription_model.dart';
+import '../utils/snackbar_helper.dart';
 
 class SubscriptionService extends GetxService {
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
@@ -85,38 +86,27 @@ class SubscriptionService extends GetxService {
         // 구독 정보 새로고침
         await loadCurrentSubscription();
 
-        // ✅ 성공 알림 추가
-        Get.snackbar(
-          '구독 완료',
-          '프리미엄 회원이 되었습니다!',
-          snackPosition: SnackPosition.TOP,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 3),
-        );
+        // ✅ 로그인 상태 + context 체크
+        if (_supabase.auth.currentUser != null && Get.context != null) {
+          // restored일 때는 메시지 표시 안 함
+          if (purchase.status == PurchaseStatus.purchased) {
+            SnackbarHelper.showSuccess('프리미엄 회원이 되었습니다!');
+          }
+        }
       } else if (purchase.status == PurchaseStatus.error) {
         print('❌ 구매 오류: ${purchase.error}');
 
-        // ✅ 오류 알림 추가
-        Get.snackbar(
-          '구독 실패',
-          '구독에 실패했습니다. 다시 시도해주세요.',
-          snackPosition: SnackPosition.TOP,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 3),
-        );
+        // ✅ 로그인 상태 + context 체크
+        if (_supabase.auth.currentUser != null && Get.context != null) {
+          SnackbarHelper.showError('구독에 실패했습니다. 다시 시도해주세요.');
+        }
       } else if (purchase.status == PurchaseStatus.canceled) {
         print('❌ 구매 취소됨');
 
-        Get.snackbar(
-          '구독 취소',
-          '구독이 취소되었습니다.',
-          snackPosition: SnackPosition.TOP,
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 2),
-        );
+        // ✅ 로그인 상태 + context 체크
+        if (_supabase.auth.currentUser != null && Get.context != null) {
+          SnackbarHelper.showInfo('구독이 취소되었습니다.');
+        }
       }
 
       // 구매 완료 처리
@@ -132,7 +122,7 @@ class SubscriptionService extends GetxService {
   Future<void> _savePurchaseToSupabase(PurchaseDetails purchase) async {
     try {
       final userId = _supabase.auth.currentUser?.id;
-      final userEmail = _supabase.auth.currentUser?.email;  // ✅ 추가
+      final userEmail = _supabase.auth.currentUser?.email;
 
       if (userId == null) {
         print('❌ 사용자 ID 없음');
@@ -140,8 +130,13 @@ class SubscriptionService extends GetxService {
       }
 
       String? purchaseToken;
+      String platform = Platform.isIOS ? 'ios' : 'android';  // ✅ 추가
+
       if (purchase is GooglePlayPurchaseDetails) {
         purchaseToken = purchase.billingClientPurchase.purchaseToken;
+        platform = 'android';  // ✅ 명시적 설정
+      } else {
+        platform = 'ios';  // ✅ Apple/iOS
       }
 
       final now = DateTime.now();
@@ -149,11 +144,12 @@ class SubscriptionService extends GetxService {
 
       final data = {
         'user_id': userId,
-        'email': userEmail,  // ✅ 추가
+        'email': userEmail,
         'tier': 'premium',
         'subscription_status': 'active',
         'purchase_token': purchaseToken,
         'product_id': purchase.productID,
+        'platform': platform,  // ✅ 추가
         'subscription_start_date': now.toIso8601String(),
         'subscription_end_date': endDate.toIso8601String(),
         'auto_renew': true,
@@ -163,9 +159,8 @@ class SubscriptionService extends GetxService {
           .from(SupabaseConfig.userSubscriptionsTable)
           .upsert(data, onConflict: 'user_id');
 
-      print('✅ 구독 정보 저장 완료 (이메일: $userEmail)');
+      print('✅ 구독 정보 저장 완료 (플랫폼: $platform, 이메일: $userEmail)');
 
-      // 저장 완료 후 이벤트 전송
       Get.find<SubscriptionLimitService>().getUserSubscriptionLimits();
     } catch (e) {
       print('❌ 구독 정보 저장 오류: $e');
@@ -300,18 +295,30 @@ class SubscriptionService extends GetxService {
     }
   }
 
-  /// 구독 관리 (플랫폼별)
+  /// 구독 관리 (구독한 플랫폼에 따라)
   Future<void> manageSubscription() async {
     try {
-      print('📱 구독 관리 페이지 열기 시도 - 플랫폼: ${Platform.operatingSystem}');
+      // ✅ 구독 정보에서 플랫폼 확인
+      final subscriptionPlatform = currentSubscription.value?.platform;
 
-      if (Platform.isAndroid) {
-        await _openAndroidSubscription();
-      } else if (Platform.isIOS) {
+      print('📱 구독 관리 - 구독 플랫폼: $subscriptionPlatform, 현재 기기: ${Platform.operatingSystem}');
+
+      // ✅ 구독한 플랫폼으로 연결
+      if (subscriptionPlatform == 'ios') {
         await _openIOSSubscription();
+      } else if (subscriptionPlatform == 'android') {
+        await _openAndroidSubscription();
       } else {
-        print('❌ 지원하지 않는 플랫폼');
-        _showManageSubscriptionError();
+        // 구독 정보가 없으면 현재 플랫폼으로
+        print('⚠️ 구독 플랫폼 정보 없음, 현재 기기 플랫폼 사용');
+        if (Platform.isAndroid) {
+          await _openAndroidSubscription();
+        } else if (Platform.isIOS) {
+          await _openIOSSubscription();
+        } else {
+          print('❌ 지원하지 않는 플랫폼');
+          _showManageSubscriptionError();
+        }
       }
     } catch (e) {
       print('❌ 구독 관리 오류: $e');
@@ -417,7 +424,7 @@ class SubscriptionService extends GetxService {
             _buildManualStep('1', 'Google Play 스토어 앱 열기'),
             _buildManualStep('2', '프로필 아이콘 탭 (우측 상단)'),
             _buildManualStep('3', '"결제 및 정기결제" 선택'),
-            _buildManualStep('4', '"정기결제" 탭에서 "알밤" 찾기'),
+            _buildManualStep('4', '"정기결제" 탭에서 "알바관리" 찾기'),
             _buildManualStep('5', '구독 취소 또는 변경'),
             const SizedBox(height: 16),
             Container(
@@ -481,7 +488,7 @@ class SubscriptionService extends GetxService {
             _buildManualStep('1', '설정 앱 열기'),
             _buildManualStep('2', '[사용자 이름] 탭'),
             _buildManualStep('3', '"구독" 선택'),
-            _buildManualStep('4', '"알밤" 앱 찾기'),
+            _buildManualStep('4', '"알바관리" 앱 찾기'),
             _buildManualStep('5', '구독 취소 또는 변경'),
             const SizedBox(height: 16),
             Container(

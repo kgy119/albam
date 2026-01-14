@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -706,8 +709,17 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
 
 // 구독 관리 안내 다이얼로그
   void _showManageSubscriptionDialog() {
-    final platform = Theme.of(context).platform;
-    final storeName = platform == TargetPlatform.iOS ? 'App Store' : 'Google Play';
+    final subscriptionPlatform = subscriptionService.currentSubscription.value?.platform;
+    final currentPlatform = Theme.of(context).platform;
+
+    print('📱 구독 플랫폼: $subscriptionPlatform');
+
+
+    // ✅ 구독 플랫폼 우선, 없으면 현재 플랫폼
+    final isIOS = subscriptionPlatform == 'ios' ||
+        (subscriptionPlatform == null && currentPlatform == TargetPlatform.iOS);
+
+    final storeName = isIOS ? 'App Store' : 'Google Play';
 
     showDialog(
       context: context,
@@ -888,17 +900,17 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
                 const SizedBox(height: 12),
 
                 // 플랫폼별 안내
-                if (platform == TargetPlatform.android) ...[
+                if (!isIOS) ...[
                   _buildManualStep('1', 'Play 스토어 앱 열기'),
                   _buildManualStep('2', '프로필 아이콘 탭 (우측 상단)'),
                   _buildManualStep('3', '"결제 및 정기결제" 선택'),
-                  _buildManualStep('4', '"정기결제" 탭에서 "알밤" 찾기'),
+                  _buildManualStep('4', '"정기결제" 탭에서 "알바관리" 찾기'),
                   _buildManualStep('5', '구독 취소 또는 변경'),
                 ] else ...[
                   _buildManualStep('1', '설정 앱 열기'),
                   _buildManualStep('2', '[사용자 이름] 탭'),
                   _buildManualStep('3', '"구독" 선택'),
-                  _buildManualStep('4', '"알밤" 앱 찾기'),
+                  _buildManualStep('4', '"알바관리" 앱 찾기'),
                   _buildManualStep('5', '구독 취소 또는 변경'),
                 ],
 
@@ -941,13 +953,31 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
 
 // 스토어 열기
   Future<void> _openStore() async {
-    final platform = Theme.of(context).platform;
-
     try {
-      if (platform == TargetPlatform.android) {
-        await _openAndroidSubscription();
-      } else if (platform == TargetPlatform.iOS) {
+      // ✅ 구독 정보에서 플랫폼 확인
+      final subscriptionPlatform = subscriptionService.currentSubscription.value?.platform;
+
+      print('📱 스토어 열기');
+      print('   구독 플랫폼: $subscriptionPlatform');
+      print('   현재 기기: ${Theme.of(context).platform}');
+
+      // ✅ 구독한 플랫폼으로 연결
+      if (subscriptionPlatform == 'ios') {
+        print('🍎 iOS 구독 → App Store로 이동');
         await _openIOSSubscription();
+      } else if (subscriptionPlatform == 'android') {
+        print('🤖 Android 구독 → Google Play로 이동');
+        await _openAndroidSubscription();
+      } else {
+        // 구독 정보가 없으면 현재 플랫폼으로
+        print('⚠️ 구독 플랫폼 정보 없음, 현재 기기 플랫폼 사용');
+        final currentPlatform = Theme.of(context).platform;
+
+        if (currentPlatform == TargetPlatform.android) {
+          await _openAndroidSubscription();
+        } else if (currentPlatform == TargetPlatform.iOS) {
+          await _openIOSSubscription();
+        }
       }
     } catch (e) {
       print('❌ 스토어 열기 오류: $e');
@@ -957,6 +987,13 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
 
 // Android 구독 관리
   Future<void> _openAndroidSubscription() async {
+    // ✅ iOS에서는 안내 다이얼로그만 표시
+    if (Platform.isIOS) {
+      _showAndroidSubscriptionGuide();
+      return;
+    }
+
+    // Android에서는 Google Play 열기 시도
     try {
       final specificUrl = Uri.parse(
           'https://play.google.com/store/account/subscriptions?'
@@ -987,16 +1024,24 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
       }
 
       if (!success) {
-        SnackbarHelper.showError('Google Play를 열 수 없습니다.');
+        _showAndroidSubscriptionGuide();
       }
     } catch (e) {
       print('❌ Android 구독 관리 오류: $e');
-      SnackbarHelper.showError('Google Play를 열 수 없습니다.');
+      _showAndroidSubscriptionGuide();
     }
   }
 
+
 // iOS 구독 관리
   Future<void> _openIOSSubscription() async {
+    // ✅ Android에서는 안내 다이얼로그만 표시
+    if (Platform.isAndroid) {
+      _showIOSSubscriptionGuide();
+      return;
+    }
+
+    // iOS에서는 App Store 열기 시도
     try {
       final settingsUrl = Uri.parse('https://apps.apple.com/account/subscriptions');
 
@@ -1006,21 +1051,211 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
           mode: LaunchMode.externalApplication,
         );
 
-        if (success) {
-          print('✅ App Store 구독 관리 열기 성공');
-        } else {
-          print('❌ App Store 구독 관리 열기 실패');
-          SnackbarHelper.showError('App Store를 열 수 없습니다.');
+        if (!success) {
+          _showIOSSubscriptionGuide();
         }
       } else {
-        print('❌ URL을 열 수 없음');
-        SnackbarHelper.showError('App Store를 열 수 없습니다.');
+        _showIOSSubscriptionGuide();
       }
     } catch (e) {
       print('❌ iOS 구독 관리 오류: $e');
-      SnackbarHelper.showError('App Store를 열 수 없습니다.');
+      _showIOSSubscriptionGuide();
     }
   }
+
+
+  // iOS 구독 안내 다이얼로그
+  void _showIOSSubscriptionGuide() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.apple, color: Colors.black),
+            const SizedBox(width: 8),
+            const Text('Apple 구독 관리'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'iOS 기기에서 구독을 관리할 수 있습니다.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue[900],
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              const Text(
+                'iOS 기기에서 구독 관리 방법:',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildManualStep('1', '설정 앱 열기'),
+              _buildManualStep('2', '[사용자 이름] 탭'),
+              _buildManualStep('3', '"구독" 선택'),
+              _buildManualStep('4', '"알바관리" 앱 찾기'),
+              _buildManualStep('5', '구독 취소 또는 변경'),
+
+              const SizedBox(height: 16),
+
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green[700], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '구독을 취소해도 현재 결제 기간이\n끝날 때까지 프리미엄 혜택이 유지됩니다.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[700],
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+  }
+
+// Android 구독 안내 다이얼로그 (iOS 기기용)
+  void _showAndroidSubscriptionGuide() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.android, color: Colors.green[700]),
+            const SizedBox(width: 8),
+            const Text('Google Play 구독 관리'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Android 기기에서 구독을 관리할 수 있습니다.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue[900],
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              const Text(
+                'Android 기기에서 구독 관리 방법:',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildManualStep('1', 'Play 스토어 앱 열기'),
+              _buildManualStep('2', '프로필 아이콘 탭 (우측 상단)'),
+              _buildManualStep('3', '"결제 및 정기결제" 선택'),
+              _buildManualStep('4', '"정기결제" 탭에서 "알바관리" 찾기'),
+              _buildManualStep('5', '구독 취소 또는 변경'),
+
+              const SizedBox(height: 16),
+
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green[700], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '구독을 취소해도 현재 결제 기간이\n끝날 때까지 프리미엄 혜택이 유지됩니다.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[700],
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+  }
+
 
 // 수동 단계 아이템
   Widget _buildManualStep(String number, String text) {

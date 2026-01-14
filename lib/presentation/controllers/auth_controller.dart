@@ -10,6 +10,7 @@ class AuthController extends GetxController {
   // 로딩 상태
   RxBool isGoogleLoading = false.obs;
   RxBool isEmailLoading = false.obs;
+  RxBool isAppleLoading = false.obs;
 
   // 이메일 폼 컨트롤러
   final emailController = TextEditingController();
@@ -294,6 +295,36 @@ class AuthController extends GetxController {
       print('Google 로그인 오류: $e');
     } finally {
       isGoogleLoading.value = false;
+    }
+  }
+
+  /// Apple 로그인 추가
+  Future<void> signInWithApple() async {
+    if (isAppleLoading.value) return;
+
+    final connectivityService = Get.find<ConnectivityService>();
+    if (!connectivityService.isConnected.value) {
+      errorMessage.value = '인터넷 연결이 필요합니다.';
+      return;
+    }
+
+    try {
+      isAppleLoading.value = true;
+      errorMessage.value = '';
+      successMessage.value = '';
+
+      final result = await _authService.signInWithApple();
+
+      if (result['success'] == true) {
+        // 성공 시 자동으로 홈으로 이동
+      } else if (result['error'] != null) {
+        errorMessage.value = result['error'];
+      }
+    } catch (e) {
+      errorMessage.value = 'Apple 로그인 중 오류가 발생했습니다.';
+      print('Apple 로그인 오류: $e');
+    } finally {
+      isAppleLoading.value = false;
     }
   }
 }

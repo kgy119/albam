@@ -152,6 +152,26 @@ class AuthService extends GetxService {
     }
   }
 
+  /// Apple 로그인 추가
+  Future<Map<String, dynamic>> signInWithApple() async {
+    try {
+      _isProcessingOAuth = true;
+
+      final redirectUrl = 'com.albamanage.albam://login-callback';
+
+      await _supabase.auth.signInWithOAuth(
+        OAuthProvider.apple,
+        redirectTo: redirectUrl,
+        authScreenLaunchMode: LaunchMode.externalApplication,
+      );
+
+      return {'success': true};
+    } catch (e) {
+      _isProcessingOAuth = false;
+      return {'success': false, 'error': _getErrorMessage(e)};
+    }
+  }
+
   /// 로그아웃
   Future<void> signOut() async {
     await _supabase.auth.signOut();
