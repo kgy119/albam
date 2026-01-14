@@ -667,6 +667,15 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
 
   // 구독 관리 처리
   Future<void> _handleManageSubscription() async {
+    // ✅ 먼저 안내 다이얼로그 표시
+    _showManageSubscriptionDialog();
+  }
+
+// 구독 관리 안내 다이얼로그
+  void _showManageSubscriptionDialog() {
+    final platform = Theme.of(context).platform;
+    final storeName = platform == TargetPlatform.iOS ? 'App Store' : 'Google Play';
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -728,11 +737,15 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
                         children: [
                           Icon(Icons.check_circle, color: Colors.green[700], size: 20),
                           const SizedBox(width: 8),
-                          const Text(
-                            '데이터는 안전하게 보관됩니다',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
+                          const Expanded(  // ✅ Expanded 추가
+                            child: Text(
+                              '데이터는 안전하게 보관됩니다',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                              maxLines: 2,  // ✅ 추가
+                              overflow: TextOverflow.ellipsis,  // ✅ 추가
                             ),
                           ),
                         ],
@@ -769,19 +782,23 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
                         children: [
                           Icon(Icons.warning_amber, color: Colors.orange[700], size: 20),
                           const SizedBox(width: 8),
-                          const Text(
-                            '구독 만료 후 무료 회원 제한',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
+                          const Expanded(  // ✅ Expanded 추가
+                            child: Text(
+                              '구독 만료 후 무료 회원 제한',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                              maxLines: 2,  // ✅ 추가
+                              overflow: TextOverflow.ellipsis,  // ✅ 추가
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '• 사업장 1개만 사용 가능 (나머지 잠금)\n'
-                            '• 직원 3명까지만 활성화 (나머지 잠금)\n'
+                        '• 사업장 1개만 사용 가능 (나머지 잠김)\n'
+                            '• 직원 3명까지만 활성화 (나머지 잠김)\n'
                             '• 잠금된 데이터는 보기만 가능',
                         style: TextStyle(
                           fontSize: 13,
@@ -807,7 +824,7 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
                     children: [
                       Icon(Icons.replay, color: Colors.blue[700], size: 20),
                       const SizedBox(width: 8),
-                      Expanded(
+                      Expanded(  // ✅ Expanded 추가
                         child: Text(
                           '재구독 시 모든 데이터 즉시 복원',
                           style: TextStyle(
@@ -815,6 +832,8 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
                             fontWeight: FontWeight.w600,
                             color: Colors.blue[900],
                           ),
+                          maxLines: 2,  // ✅ 최대 2줄
+                          overflow: TextOverflow.ellipsis,  // ✅ 넘치면 ... 표시
                         ),
                       ),
                     ],
@@ -825,20 +844,30 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
                 const Divider(),
                 const SizedBox(height: 16),
 
-                // Google Play 스토어 안내
-                const Text(
-                  'Google Play 스토어에서 구독 관리',
-                  style: TextStyle(
+                // 스토어 안내
+                Text(
+                  '$storeName에서 구독 관리',
+                  style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
                   ),
                 ),
                 const SizedBox(height: 12),
-                _buildStepItem('1', 'Play 스토어 앱 열기'),
-                _buildStepItem('2', '프로필 아이콘 탭 (우측 상단)'),
-                _buildStepItem('3', '"결제 및 정기결제" 선택'),
-                _buildStepItem('4', '"정기결제" 탭에서 "알밤" 찾기'),
-                _buildStepItem('5', '구독 취소 또는 변경'),
+
+                // 플랫폼별 안내
+                if (platform == TargetPlatform.android) ...[
+                  _buildManualStep('1', 'Play 스토어 앱 열기'),
+                  _buildManualStep('2', '프로필 아이콘 탭 (우측 상단)'),
+                  _buildManualStep('3', '"결제 및 정기결제" 선택'),
+                  _buildManualStep('4', '"정기결제" 탭에서 "알밤" 찾기'),
+                  _buildManualStep('5', '구독 취소 또는 변경'),
+                ] else ...[
+                  _buildManualStep('1', '설정 앱 열기'),
+                  _buildManualStep('2', '[사용자 이름] 탭'),
+                  _buildManualStep('3', '"구독" 선택'),
+                  _buildManualStep('4', '"알밤" 앱 찾기'),
+                  _buildManualStep('5', '구독 취소 또는 변경'),
+                ],
 
                 const SizedBox(height: 20),
 
@@ -859,15 +888,12 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
                       child: ElevatedButton(
                         onPressed: () async {
                           Navigator.pop(context);
-                          final url = Uri.parse('https://play.google.com/store/account/subscriptions');
-                          if (await canLaunchUrl(url)) {
-                            await launchUrl(url, mode: LaunchMode.externalApplication);
-                          }
+                          await _openStore();
                         },
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        child: const Text('스토어 열기'),
+                        child: Text('$storeName 열기'),
                       ),
                     ),
                   ],
@@ -880,15 +906,99 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
     );
   }
 
-  Widget _buildStepItem(String number, String text) {
+// 스토어 열기
+  Future<void> _openStore() async {
+    final platform = Theme.of(context).platform;
+
+    try {
+      if (platform == TargetPlatform.android) {
+        await _openAndroidSubscription();
+      } else if (platform == TargetPlatform.iOS) {
+        await _openIOSSubscription();
+      }
+    } catch (e) {
+      print('❌ 스토어 열기 오류: $e');
+      SnackbarHelper.showError('스토어를 열 수 없습니다.');
+    }
+  }
+
+// Android 구독 관리
+  Future<void> _openAndroidSubscription() async {
+    try {
+      final specificUrl = Uri.parse(
+          'https://play.google.com/store/account/subscriptions?'
+              'package=com.albamanage.albam&'
+              'sku=premium_monthly_subscription'
+      );
+
+      final generalUrl = Uri.parse(
+          'https://play.google.com/store/account/subscriptions'
+      );
+
+      bool success = false;
+
+      if (await canLaunchUrl(specificUrl)) {
+        success = await launchUrl(
+          specificUrl,
+          mode: LaunchMode.externalApplication,
+        );
+        print(success ? '✅ Google Play 구독 페이지 열기 성공' : '❌ 실패');
+      }
+
+      if (!success && await canLaunchUrl(generalUrl)) {
+        success = await launchUrl(
+          generalUrl,
+          mode: LaunchMode.externalApplication,
+        );
+        print(success ? '✅ Google Play 구독 목록 열기 성공' : '❌ 실패');
+      }
+
+      if (!success) {
+        SnackbarHelper.showError('Google Play를 열 수 없습니다.');
+      }
+    } catch (e) {
+      print('❌ Android 구독 관리 오류: $e');
+      SnackbarHelper.showError('Google Play를 열 수 없습니다.');
+    }
+  }
+
+// iOS 구독 관리
+  Future<void> _openIOSSubscription() async {
+    try {
+      final settingsUrl = Uri.parse('https://apps.apple.com/account/subscriptions');
+
+      if (await canLaunchUrl(settingsUrl)) {
+        final success = await launchUrl(
+          settingsUrl,
+          mode: LaunchMode.externalApplication,
+        );
+
+        if (success) {
+          print('✅ App Store 구독 관리 열기 성공');
+        } else {
+          print('❌ App Store 구독 관리 열기 실패');
+          SnackbarHelper.showError('App Store를 열 수 없습니다.');
+        }
+      } else {
+        print('❌ URL을 열 수 없음');
+        SnackbarHelper.showError('App Store를 열 수 없습니다.');
+      }
+    } catch (e) {
+      print('❌ iOS 구독 관리 오류: $e');
+      SnackbarHelper.showError('App Store를 열 수 없습니다.');
+    }
+  }
+
+// 수동 단계 아이템
+  Widget _buildManualStep(String number, String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6, left: 4),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 20,
-            height: 20,
+            width: 24,
+            height: 24,
             decoration: BoxDecoration(
               color: Colors.blue[700],
               shape: BoxShape.circle,
@@ -898,7 +1008,7 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
                 number,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -906,16 +1016,18 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 13),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                text,
+                style: const TextStyle(fontSize: 14),
+              ),
             ),
           ),
         ],
       ),
     );
   }
-
   void _showLogoutDialog(BuildContext context, AuthService authService) {
     showDialog(
       context: context,

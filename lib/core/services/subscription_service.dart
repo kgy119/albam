@@ -294,36 +294,17 @@ class SubscriptionService extends GetxService {
     }
   }
 
-  /// 구독 취소 (Google Play Console로 리다이렉트)
+  /// 구독 관리 (플랫폼별)
   Future<void> manageSubscription() async {
     try {
-      print('📱 구독 관리 페이지 열기 시도');
+      print('📱 구독 관리 페이지 열기 시도 - 플랫폼: ${Platform.operatingSystem}');
 
-      // Android: Google Play 구독 센터
-      final androidUrl = Uri.parse(
-          'https://play.google.com/store/account/subscriptions?package=com.albamanage.albam&sku=premium_monthly_subscription'
-      );
-
-      // iOS: App Store 구독 관리 (향후 지원)
-      final iosUrl = Uri.parse('https://apps.apple.com/account/subscriptions');
-
-      // 플랫폼별 URL 선택
-      final url = Platform.isAndroid ? androidUrl : iosUrl;
-
-      if (await canLaunchUrl(url)) {
-        final launched = await launchUrl(
-          url,
-          mode: LaunchMode.externalApplication,
-        );
-
-        if (launched) {
-          print('✅ 구독 관리 페이지 열기 성공');
-        } else {
-          print('❌ 구독 관리 페이지 열기 실패');
-          _showManageSubscriptionError();
-        }
+      if (Platform.isAndroid) {
+        await _openAndroidSubscription();
+      } else if (Platform.isIOS) {
+        await _openIOSSubscription();
       } else {
-        print('❌ URL을 열 수 없음: $url');
+        print('❌ 지원하지 않는 플랫폼');
         _showManageSubscriptionError();
       }
     } catch (e) {
@@ -332,17 +313,131 @@ class SubscriptionService extends GetxService {
     }
   }
 
-  /// 구독 관리 오류 메시지
+  /// Android 구독 관리
+  Future<void> _openAndroidSubscription() async {
+    try {
+      // 방법 1: 특정 구독으로 바로 이동
+      final specificUrl = Uri.parse(
+          'https://play.google.com/store/account/subscriptions?'
+              'package=com.albamanage.albam&'
+              'sku=premium_monthly_subscription'
+      );
+
+      // 방법 2: 전체 구독 목록
+      final generalUrl = Uri.parse(
+          'https://play.google.com/store/account/subscriptions'
+      );
+
+      // 먼저 특정 구독으로 시도
+      bool success = false;
+
+      if (await canLaunchUrl(specificUrl)) {
+        success = await launchUrl(
+          specificUrl,
+          mode: LaunchMode.externalApplication,
+        );
+        print(success ? '✅ Google Play 구독 페이지 열기 성공' : '❌ 실패');
+      }
+
+      // 실패 시 일반 구독 목록으로 시도
+      if (!success && await canLaunchUrl(generalUrl)) {
+        success = await launchUrl(
+          generalUrl,
+          mode: LaunchMode.externalApplication,
+        );
+        print(success ? '✅ Google Play 구독 목록 열기 성공' : '❌ 실패');
+      }
+
+      if (!success) {
+        _showManageSubscriptionError();
+      }
+    } catch (e) {
+      print('❌ Android 구독 관리 오류: $e');
+      _showManageSubscriptionError();
+    }
+  }
+
+  /// iOS 구독 관리
+  Future<void> _openIOSSubscription() async {
+    try {
+      // iOS 설정 앱의 구독 관리 페이지
+      final settingsUrl = Uri.parse('https://apps.apple.com/account/subscriptions');
+
+      if (await canLaunchUrl(settingsUrl)) {
+        final success = await launchUrl(
+          settingsUrl,
+          mode: LaunchMode.externalApplication,
+        );
+
+        if (success) {
+          print('✅ App Store 구독 관리 열기 성공');
+        } else {
+          print('❌ App Store 구독 관리 열기 실패');
+          _showIOSManageSubscriptionDialog();
+        }
+      } else {
+        print('❌ URL을 열 수 없음');
+        _showIOSManageSubscriptionDialog();
+      }
+    } catch (e) {
+      print('❌ iOS 구독 관리 오류: $e');
+      _showIOSManageSubscriptionDialog();
+    }
+  }
+
+  /// 구독 관리 오류 다이얼로그 (Android)
   void _showManageSubscriptionError() {
     Get.dialog(
       AlertDialog(
-        title: const Text('구독 관리'),
-        content: const Text(
-            'Google Play 스토어 앱에서 직접 구독을 관리할 수 있습니다.\n\n'
-                '1. Google Play 스토어 앱 열기\n'
-                '2. 프로필 아이콘 탭\n'
-                '3. "결제 및 정기결제" 선택\n'
-                '4. "정기결제" 탭에서 알밤 찾기'
+        title: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.blue[700]),
+            const SizedBox(width: 8),
+            const Text('구독 관리'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Google Play 스토어에서 구독을 관리하세요:',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildManualStep('1', 'Google Play 스토어 앱 열기'),
+            _buildManualStep('2', '프로필 아이콘 탭 (우측 상단)'),
+            _buildManualStep('3', '"결제 및 정기결제" 선택'),
+            _buildManualStep('4', '"정기결제" 탭에서 "알밤" 찾기'),
+            _buildManualStep('5', '구독 취소 또는 변경'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '구독을 취소해도 현재 결제 기간이\n끝날 때까지 프리미엄 혜택이 유지됩니다.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -354,6 +449,109 @@ class SubscriptionService extends GetxService {
     );
   }
 
+  /// iOS 구독 관리 안내 다이얼로그
+  void _showIOSManageSubscriptionDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.blue[700]),
+            const SizedBox(width: 8),
+            const Text('구독 관리'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'App Store에서 구독을 관리하세요:',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildManualStep('1', '설정 앱 열기'),
+            _buildManualStep('2', '[사용자 이름] 탭'),
+            _buildManualStep('3', '"구독" 선택'),
+            _buildManualStep('4', '"알밤" 앱 찾기'),
+            _buildManualStep('5', '구독 취소 또는 변경'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '구독을 취소해도 현재 결제 기간이\n끝날 때까지 프리미엄 혜택이 유지됩니다.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 수동 단계 아이템
+  Widget _buildManualStep(String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: Colors.blue[700],
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                number,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                text,
+                style: const TextStyle(fontSize: 14),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   /// 프리미엄 사용자 여부
   bool get isPremiumUser {
