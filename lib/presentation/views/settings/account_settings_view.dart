@@ -843,8 +843,7 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
                       const SizedBox(height: 8),
                       Text(
                         '• 사업장 1개만 사용 가능 (나머지 잠김)\n'
-                            '• 직원 3명까지만 활성화 (나머지 잠김)\n'
-                            '• 잠금된 데이터는 보기만 가능',
+                            '• 직원 3명까지만 활성화 (나머지 잠김)',
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.grey[700],

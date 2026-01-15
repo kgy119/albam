@@ -19,12 +19,12 @@ class SubscriptionLimits {
 
   factory SubscriptionLimits.fromJson(Map<String, dynamic> json) {
     return SubscriptionLimits(
-      tier: json['tier'] as String,
-      maxWorkplaces: json['max_workplaces'] as int,
-      maxEmployeesPerWorkplace: json['max_employees_per_workplace'] as int,
-      currentWorkplaceCount: json['current_workplace_count'] as int,
-      canAddWorkplace: json['can_add_workplace'] as bool,
-      price: json['price'] as int,
+      tier: json['tier'] as String? ?? 'free',
+      maxWorkplaces: (json['max_workplaces'] as int?) ?? 1,
+      maxEmployeesPerWorkplace: (json['max_employees_per_workplace'] as int?) ?? 3,
+      currentWorkplaceCount: (json['current_workplaces'] as int?) ?? 0,
+      canAddWorkplace: (json['can_add_workplace'] as bool?) ?? false,
+      price: (json['price'] as int?) ?? 0,
       description: json['description'] as String?,
     );
   }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../core/services/schedule_service.dart';
 import '../../core/services/workplace_service.dart';
 import '../../core/services/employee_service.dart';
 import '../../core/services/subscription_limit_service.dart';
+import '../../core/utils/salary_calculator.dart';
 import '../../core/utils/snackbar_helper.dart';
 import '../../data/models/workplace_model.dart';
 
@@ -194,6 +196,9 @@ class WorkplaceController extends GetxController {
   // 사업장별 직원 수 저장
   RxMap<String, int> employeeCountMap = <String, int>{}.obs;
 
+// ✅ 사업장별 월별 급여 합계 저장
+  RxMap<String, double> monthlySalaryMap = <String, double>{}.obs;
+
   /// 모든 사업장의 직원 수 조회
   Future<void> loadAllEmployeeCounts() async {
     try {
@@ -201,6 +206,9 @@ class WorkplaceController extends GetxController {
         final count = await _employeeService.getEmployeeCount(workplace.id);
         employeeCountMap[workplace.id] = count;
       }
+
+      // ✅ 월별 급여도 함께 조회
+      await loadAllMonthlySalaries();
     } catch (e) {
       print('직원 수 조회 오류: $e');
     }
@@ -209,5 +217,58 @@ class WorkplaceController extends GetxController {
   /// 특정 사업장의 직원 수 반환
   int getEmployeeCount(String workplaceId) {
     return employeeCountMap[workplaceId] ?? 0;
+  }
+
+  /// ✅ 모든 사업장의 이번 달 급여 합계 조회
+  Future<void> loadAllMonthlySalaries() async {
+    try {
+      final now = DateTime.now();
+
+      for (var workplace in workplaces) {
+        // 해당 사업장의 직원 목록 조회
+        final employees = await _employeeService.getEmployees(workplace.id);
+
+        if (employees.isEmpty) {
+          monthlySalaryMap[workplace.id] = 0;
+          continue;
+        }
+
+        // 해당 사업장의 이번 달 스케줄 조회
+        final schedules = await ScheduleService().getMonthlySchedules(
+          workplaceId: workplace.id,
+          year: now.year,
+          month: now.month,
+        );
+
+        // 직원별로 급여 계산
+        double totalNetPay = 0;
+
+        for (var employee in employees) {
+          // 해당 직원의 이번 달 스케줄만 필터링
+          final employeeSchedules = schedules
+              .where((schedule) => schedule.employeeId == employee.id)
+              .toList();
+
+          if (employeeSchedules.isEmpty) continue;
+
+          // 급여 계산 (SalaryCalculator 사용)
+          final salaryData = SalaryCalculator.calculateMonthlySalary(
+            schedules: employeeSchedules,
+            hourlyWage: employee.hourlyWage.toDouble(),
+          );
+
+          totalNetPay += salaryData['netPay'];
+        }
+
+        monthlySalaryMap[workplace.id] = totalNetPay;
+      }
+    } catch (e) {
+      print('월별 급여 조회 오류: $e');
+    }
+  }
+
+  /// ✅ 특정 사업장의 이번 달 급여 합계 반환
+  double getMonthlySalary(String workplaceId) {
+    return monthlySalaryMap[workplaceId] ?? 0;
   }
 }

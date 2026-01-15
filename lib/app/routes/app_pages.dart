@@ -46,6 +46,9 @@ class AppPages {
     GetPage(
       name: AppRoutes.employeeList,
       page: () => const EmployeeListView(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<WorkplaceDetailController>(() => WorkplaceDetailController());
+      }),
     ),
     GetPage(
       name: AppRoutes.addEmployee,

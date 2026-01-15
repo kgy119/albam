@@ -16,7 +16,7 @@ class EmployeeService extends GetxService {
           .from(SupabaseConfig.employeesTable)
           .select()
           .eq('workplace_id', workplaceId)
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: true);
 
       print('조회된 직원 수: ${response.length}');
 

@@ -26,7 +26,7 @@ class WorkplaceService extends GetxService {
           .from(SupabaseConfig.workplacesTable)
           .select()
           .eq('owner_id', userId)
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: true);
 
       print('조회된 사업장 개수: ${response.length}');
 

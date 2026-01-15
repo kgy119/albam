@@ -44,7 +44,8 @@ class _EditEmployeeViewState extends State<EditEmployeeView> {
   @override
   void initState() {
     super.initState();
-    employee = Get.arguments as Employee;
+    final args = Get.arguments as Map<String, dynamic>;
+    employee = args['employee'] as Employee;
     _nameController = TextEditingController(text: employee.name);
     _phoneController = TextEditingController(text: employee.phoneNumber);
     _wageController = TextEditingController(text: employee.hourlyWage.toString());

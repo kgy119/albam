@@ -126,14 +126,18 @@ class _HomeViewState extends State<HomeView> {
 
   Widget _buildWorkplaceCard(workplace, int index, BuildContext context) {
     final isPremium = subscriptionLimits?.isPremium ?? false;
-    final isLocked = !isPremium && index >= 1; // 무료는 첫 번째만 활성
+
+    // ✅ 역순으로 계산: 마지막 사업장(가장 오래된 것)만 활성화
+    final totalWorkplaces = controller.workplaces.length;
+    final isFirstWorkplace = (index == totalWorkplaces - 1);
+    final isLocked = !isPremium && !isFirstWorkplace;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Stack(
         children: [
           InkWell(
-            onTap: isLocked ? () => _showUpgradeDialog() : () {
+            onTap: isLocked ? () => _showUpgradeDialog(workplace: workplace) : () {
               Get.toNamed(AppRoutes.workplaceDetail, arguments: workplace);
             },
             borderRadius: BorderRadius.circular(16),
@@ -228,23 +232,53 @@ class _HomeViewState extends State<HomeView> {
                   const SizedBox(height: 16),
 
                   // 통계 정보
-                  Obx(() => Row(
-                    children: [
-                      _buildStatChip(
-                        icon: Icons.people_outline,
-                        label: '직원',
-                        value: '${controller.getEmployeeCount(workplace.id)}명',
-                        color: Theme.of(context).primaryColor,
-                      ),
-                      const SizedBox(width: 12),
-                      _buildStatChip(
-                        icon: Icons.calendar_today_outlined,
-                        label: '이번 달',
-                        value: '관리중',
-                        color: AppTheme.successColor,
-                      ),
-                    ],
-                  )),
+                  Obx(() {
+                    final employeeCount = controller.getEmployeeCount(workplace.id);
+                    final monthlySalary = controller.getMonthlySalary(workplace.id);
+
+                    return Row(
+                      children: [
+                        // 직원 칩
+                        Expanded(
+                          child: _buildClickableStatChip(
+                            icon: Icons.people_outline,
+                            label: '직원',
+                            value: '$employeeCount명',
+                            color: Theme.of(context).primaryColor,
+                            onTap: isLocked ? null : () {
+                              Get.toNamed(
+                                AppRoutes.employeeList,
+                                arguments: workplace,
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // 이번 달 급여 칩
+                        Expanded(
+                          child: _buildClickableStatChip(
+                            icon: Icons.calendar_today_outlined,
+                            label: '이번 달',
+                            value: monthlySalary > 0
+                                ? '${NumberFormat('#,###').format(monthlySalary)}원'
+                                : '-',
+                            color: AppTheme.successColor,
+                            onTap: isLocked ? null : () {
+                              final now = DateTime.now();
+                              Get.toNamed(
+                                AppRoutes.monthlySalarySummary,
+                                arguments: {
+                                  'workplace': workplace,
+                                  'year': now.year,
+                                  'month': now.month,
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
                 ],
               ),
             ),
@@ -261,7 +295,7 @@ class _HomeViewState extends State<HomeView> {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: _showUpgradeDialog,
+                    onTap: () => _showUpgradeDialog(workplace: workplace),
                     borderRadius: BorderRadius.circular(12),
                     child: Center(
                       child: Column(
@@ -297,6 +331,58 @@ class _HomeViewState extends State<HomeView> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildClickableStatChip({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: color.withOpacity(0.8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: color,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -436,7 +522,7 @@ class _HomeViewState extends State<HomeView> {
   }
 
   // 업그레이드 다이얼로그
-  void _showUpgradeDialog() {
+  void _showUpgradeDialog({dynamic workplace}) {
     Get.dialog(
       AlertDialog(
         title: Row(
@@ -488,6 +574,15 @@ class _HomeViewState extends State<HomeView> {
           ],
         ),
         actions: [
+          if (workplace != null)
+            TextButton(
+              onPressed: () {
+                Get.back();
+                _showDeleteConfirmDialog(workplace.id);
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('삭제'),
+            ),
           TextButton(
             onPressed: () => Get.back(),
             child: const Text('취소'),

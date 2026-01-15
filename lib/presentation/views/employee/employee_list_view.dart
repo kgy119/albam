@@ -49,7 +49,8 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
                 itemCount: controller.employees.length,
                 itemBuilder: (context, index) {
                   final employee = controller.employees[index];
-                  final isLocked = !isPremium && index >= 3; // 무료는 3명까지
+                  // ✅ 오름차순: 처음 3명(index 0, 1, 2)만 활성화
+                  final isLocked = !isPremium && index >= 3;
                   return _buildEmployeeCard(employee, isLocked);
                 },
               );
@@ -118,7 +119,7 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
       child: Stack(
         children: [
           InkWell(
-            onTap: isLocked ? null : () {
+            onTap: isLocked ? () => _showUpgradeDialog(employee: employee) : () {
               Get.toNamed(
                 AppRoutes.editEmployee,
                 arguments: {
@@ -373,7 +374,7 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () => _showUpgradeDialog(),
+                    onTap: () => _showUpgradeDialog(employee: employee),
                     borderRadius: BorderRadius.circular(12),
                     child: Center(
                       child: Column(
@@ -532,49 +533,85 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
       ),
     );
   }
-  void _showUpgradeDialog() {
+  void _showUpgradeDialog({dynamic employee}) {
     Get.dialog(
       AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
         title: Row(
           children: [
             Icon(Icons.workspace_premium, color: Colors.amber[700]),
             const SizedBox(width: 8),
-            const Text('프리미엄 구독 필요'),
+            const Text(
+              '프리미엄 구독 필요',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
-        content: Column(
+        content: const Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '이 직원은 프리미엄 구독이 필요합니다.',
-              style: TextStyle(fontSize: 15),
-            ),
-            const SizedBox(height: 12),
-            const Text(
+            Text('이 직원은 프리미엄 구독이 필요합니다.'),
+            SizedBox(height: 12),
+            Text(
               '무료 회원은 최대 3명의 직원만 활성화할 수 있습니다.',
               style: TextStyle(fontSize: 13, color: Colors.grey),
             ),
           ],
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+
+        /// 🔥 핵심: Row ❌ → Wrap ✅
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('취소'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              Get.toNamed(AppRoutes.accountSettings);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber[600],
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('구독하기'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.end,
+            children: [
+              if (employee != null)
+                OutlinedButton(
+                  onPressed: () {
+                    Get.back();
+                    _showDeleteDialog(employee);
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                    minimumSize: const Size(72, 44),
+                  ),
+                  child: const Text('삭제'),
+                ),
+
+              OutlinedButton(
+                onPressed: () => Get.back(),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(72, 44),
+                ),
+                child: const Text('취소'),
+              ),
+
+              ElevatedButton(
+                onPressed: () {
+                  Get.back();
+                  Get.toNamed(AppRoutes.accountSettings);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber[600],
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(96, 44),
+                ),
+                child: const Text(
+                  '구독하기',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+
 }
