@@ -5,12 +5,26 @@ import '../../data/models/subscription_limits_model.dart';
 class SubscriptionLimitService extends GetxService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
+  // ✅ 구독 정보를 Rx로 저장
+  Rxn<SubscriptionLimits> currentLimits = Rxn<SubscriptionLimits>();
+  RxBool isLoading = false.obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    // ✅ 서비스 시작 시 자동 로드
+    getUserSubscriptionLimits();
+  }
+
   /// 사용자의 구독 한도 조회
   Future<SubscriptionLimits?> getUserSubscriptionLimits() async {
     try {
+      isLoading.value = true;
+
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) {
         print('❌ 사용자 ID 없음');
+        currentLimits.value = null;
         return null;
       }
 
@@ -21,13 +35,19 @@ class SubscriptionLimitService extends GetxService {
 
       if (response == null) {
         print('❌ 구독 한도 정보 없음');
+        currentLimits.value = null;
         return null;
       }
 
-      return SubscriptionLimits.fromJson(response as Map<String, dynamic>);
+      final limits = SubscriptionLimits.fromJson(response as Map<String, dynamic>);
+      currentLimits.value = limits;
+      return limits;
     } catch (e) {
       print('❌ 구독 한도 조회 오류: $e');
+      currentLimits.value = null;
       return null;
+    } finally {
+      isLoading.value = false;
     }
   }
 

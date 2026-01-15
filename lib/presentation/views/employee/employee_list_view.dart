@@ -15,48 +15,47 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
 
   @override
   Widget build(BuildContext context) {
-    final limitService = Get.put(SubscriptionLimitService());
+    final limitService = Get.find<SubscriptionLimitService>();
 
     return Scaffold(
       appBar: AppBar(
         title: Text('${controller.workplace.name} 직원 관리'),
       ),
       body: SafeArea(
-        child: FutureBuilder<SubscriptionLimits?>(
-          future: limitService.getUserSubscriptionLimits(),
-          builder: (context, snapshot) {
-            final subscriptionLimits = snapshot.data;
-            final isPremium = subscriptionLimits?.isPremium ?? false;
+        child: Obx(() {
+          // ✅ 구독 정보 로딩 중
+          if (limitService.isLoading.value) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-            return Obx(() {
-              if (controller.isLoadingEmployees.value) {
-                return const Center(
-                  child: CircularProgressIndicator(),
-                );
-              }
+          final isPremium = limitService.currentLimits.value?.isPremium ?? false;
 
-              if (controller.employees.isEmpty) {
-                return _buildEmptyState();
-              }
+          // 직원 목록 로딩 중
+          if (controller.isLoadingEmployees.value) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
 
-              return ListView.builder(
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  16,
-                  16,
-                  MediaQuery.of(context).padding.bottom + 80,
-                ),
-                itemCount: controller.employees.length,
-                itemBuilder: (context, index) {
-                  final employee = controller.employees[index];
-                  // ✅ 오름차순: 처음 3명(index 0, 1, 2)만 활성화
-                  final isLocked = !isPremium && index >= 3;
-                  return _buildEmployeeCard(employee, isLocked);
-                },
-              );
-            });
-          },
-        ),
+          if (controller.employees.isEmpty) {
+            return _buildEmptyState();
+          }
+
+          return ListView.builder(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              MediaQuery.of(context).padding.bottom + 80,
+            ),
+            itemCount: controller.employees.length,
+            itemBuilder: (context, index) {
+              final employee = controller.employees[index];
+              final isLocked = !isPremium && index >= 3;
+              return _buildEmployeeCard(employee, isLocked);
+            },
+          );
+        }),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {

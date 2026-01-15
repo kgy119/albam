@@ -50,7 +50,7 @@ class _HomeViewState extends State<HomeView> {
             onPressed: () async {
               await Get.toNamed(AppRoutes.accountSettings);
               // 설정 화면에서 돌아오면 구독 정보 새로고침
-              _loadSubscriptionLimits();
+              await _limitService.getUserSubscriptionLimits();
             },
             tooltip: '설정',
           ),
@@ -60,10 +60,11 @@ class _HomeViewState extends State<HomeView> {
         child: RefreshIndicator(
           onRefresh: () async {
             await controller.loadWorkplaces();
-            await _loadSubscriptionLimits();
+            await _limitService.getUserSubscriptionLimits();
           },
           child: Obx(() {
-            if (controller.isLoading.value || isLoadingLimits) {
+            // ✅ 구독 정보 로딩 중
+            if (_limitService.isLoading.value || controller.isLoading.value) {
               return const Center(child: CircularProgressIndicator());
             }
 

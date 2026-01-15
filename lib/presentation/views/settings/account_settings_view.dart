@@ -109,97 +109,110 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
     final authService = Get.find<AuthService>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('설정'),
-      ),
-      body: RefreshIndicator(
-        onRefresh: _loadSubscriptionInfo,
-        child: ListView(
-          children: [
-            // 📱 계정 정보 섹션
-            _buildSectionHeader('계정 정보'),
-            _buildAccountCard(authService),
+        appBar: AppBar(
+          title: const Text('설정'),
+        ),
+        body: Obx(() {
+          // ✅ 구독 정보 로딩 중
+          if (limitService.isLoading.value) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-            const SizedBox(height: 16),
+          return RefreshIndicator(
+            onRefresh: () async {
+              await subscriptionService.loadCurrentSubscription();
+              await limitService.getUserSubscriptionLimits();
+            },
+            child: ListView(
+              children: [
+                // 📱 계정 정보 섹션
+                _buildSectionHeader('계정 정보'),
+                _buildAccountCard(authService),
 
-            // 📋 앱 정보 섹션
-            _buildSectionHeader('앱 정보'),
-            Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.info_outline),
-                    title: const Text('버전 정보'),
-                    trailing: Text(
-                      appVersion,
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 14,
+                const SizedBox(height: 16),
+
+                // 📋 앱 정보 섹션
+                _buildSectionHeader('앱 정보'),
+                Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.info_outline),
+                        title: const Text('버전 정보'),
+                        trailing: Text(
+                          appVersion,
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 14,
+                          ),
+                        ),
                       ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.description_outlined),
+                        title: const Text('이용약관'),
+                        trailing: const Icon(Icons.chevron_right, size: 20),
+                        onTap: () {
+                          SnackbarHelper.showInfo('이용약관 페이지를 준비중입니다.',
+                              title: '준비중');
+                        },
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.privacy_tip_outlined),
+                        title: const Text('개인정보처리방침'),
+                        trailing: const Icon(Icons.chevron_right, size: 20),
+                        onTap: () {
+                          SnackbarHelper.showInfo('개인정보처리방침 페이지를 준비중입니다.',
+                              title: '준비중');
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // 🚪 로그아웃
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showLogoutDialog(context, authService),
+                    icon: const Icon(Icons.logout),
+                    label: const Text('로그아웃'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: BorderSide(color: Colors.grey[400]!),
                     ),
                   ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.description_outlined),
-                    title: const Text('이용약관'),
-                    trailing: const Icon(Icons.chevron_right, size: 20),
-                    onTap: () {
-                      SnackbarHelper.showInfo('이용약관 페이지를 준비중입니다.', title: '준비중');
-                    },
+                ),
+
+                const SizedBox(height: 12),
+
+                // ⚠️ 회원탈퇴
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: OutlinedButton.icon(
+                    onPressed: () =>
+                        _showDeleteAccountDialog(context, accountService),
+                    icon: const Icon(Icons.delete_forever, color: Colors.red),
+                    label: const Text(
+                      '회원탈퇴',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: const BorderSide(color: Colors.red),
+                    ),
                   ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.privacy_tip_outlined),
-                    title: const Text('개인정보처리방침'),
-                    trailing: const Icon(Icons.chevron_right, size: 20),
-                    onTap: () {
-                      SnackbarHelper.showInfo('개인정보처리방침 페이지를 준비중입니다.', title: '준비중');
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // 🚪 로그아웃
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: OutlinedButton.icon(
-                onPressed: () => _showLogoutDialog(context, authService),
-                icon: const Icon(Icons.logout),
-                label: const Text('로그아웃'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  side: BorderSide(color: Colors.grey[400]!),
                 ),
-              ),
+
+                const SizedBox(height: 32),
+              ],
             ),
-
-            const SizedBox(height: 12),
-
-            // ⚠️ 회원탈퇴
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: OutlinedButton.icon(
-                onPressed: () => _showDeleteAccountDialog(context, accountService),
-                icon: const Icon(Icons.delete_forever, color: Colors.red),
-                label: const Text(
-                  '회원탈퇴',
-                  style: TextStyle(color: Colors.red),
-                ),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  side: const BorderSide(color: Colors.red),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
+          );
+        }),
     );
   }
 
