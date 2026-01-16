@@ -47,20 +47,20 @@ class WorkplaceController extends GetxController {
       isAdding.value = true;
 
       // ✅ 최신 구독 상태를 다시 가져옴
+      print('🔄 사업장 추가 전 구독 상태 확인');
       await _limitService.getUserSubscriptionLimits();
 
       // 1. 사업장 추가 가능 여부 확인
       final canAdd = await _limitService.canAddWorkplace();
 
       if (!canAdd) {
-        // 한도 초과 시 구독 안내 다이얼로그 표시
         _showSubscriptionLimitDialog();
         return;
       }
 
       // 2. 사업장 추가
       final newWorkplace = await _workplaceService.addWorkplace(name);
-      workplaces.insert(0, newWorkplace);
+      workplaces.add(newWorkplace);  // ✅ insert(0, ...) → add(...)
 
       await loadAllEmployeeCounts();
 

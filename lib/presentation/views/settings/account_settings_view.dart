@@ -54,6 +54,13 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
     limitService = Get.find<SubscriptionLimitService>();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // ✅ 화면이 다시 보일 때마다 구독 정보 새로고침
+    _refreshSubscriptionInfo();
+  }
+
   Future<void> _loadAppVersion() async {
     try {
       final packageInfo = await PackageInfo.fromPlatform();

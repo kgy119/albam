@@ -4,42 +4,16 @@ import 'package:intl/intl.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../controllers/workplace_controller.dart';
 import '../../widgets/add_workplace_dialog.dart';
-import '../../../core/services/auth_service.dart';
 import '../../../core/services/subscription_limit_service.dart';
-import '../../../data/models/subscription_limits_model.dart';
 import '../../../app/routes/app_routes.dart';
 
-class HomeView extends StatefulWidget {
+class HomeView extends StatelessWidget {
   const HomeView({super.key});
 
   @override
-  State<HomeView> createState() => _HomeViewState();
-}
-
-class _HomeViewState extends State<HomeView> {
-  final WorkplaceController controller = Get.find<WorkplaceController>();
-  final SubscriptionLimitService _limitService = Get.put(SubscriptionLimitService());
-
-  SubscriptionLimits? subscriptionLimits;
-  bool isLoadingLimits = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSubscriptionLimits();
-  }
-
-  Future<void> _loadSubscriptionLimits() async {
-    final limits = await _limitService.getUserSubscriptionLimits();
-    setState(() {
-      subscriptionLimits = limits;
-      isLoadingLimits = false;
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final authService = Get.find<AuthService>();
+    final controller = Get.find<WorkplaceController>();
+    final limitService = Get.find<SubscriptionLimitService>();
 
     return Scaffold(
       appBar: AppBar(
@@ -49,8 +23,9 @@ class _HomeViewState extends State<HomeView> {
             icon: const Icon(Icons.settings),
             onPressed: () async {
               await Get.toNamed(AppRoutes.accountSettings);
-              // 설정 화면에서 돌아오면 구독 정보 새로고침
-              await _limitService.getUserSubscriptionLimits();
+              // ✅ 설정 화면에서 돌아오면 구독 정보 새로고침
+              print('🔄 설정 화면에서 복귀 - 구독 정보 새로고침');
+              await limitService.getUserSubscriptionLimits();
             },
             tooltip: '설정',
           ),
@@ -59,12 +34,13 @@ class _HomeViewState extends State<HomeView> {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
+            print('🔄 아래로 당겨서 새로고침');
             await controller.loadWorkplaces();
-            await _limitService.getUserSubscriptionLimits();
+            await limitService.getUserSubscriptionLimits();
           },
           child: Obx(() {
-            // ✅ 구독 정보 로딩 중
-            if (_limitService.isLoading.value || controller.isLoading.value) {
+            // ✅ Obx 내부에서 실시간으로 구독 상태 감지
+            if (limitService.isLoading.value || controller.isLoading.value) {
               return const Center(child: CircularProgressIndicator());
             }
 
@@ -72,7 +48,7 @@ class _HomeViewState extends State<HomeView> {
               return _buildEmptyState(context);
             }
 
-            return _buildWorkplaceList(context);
+            return _buildWorkplaceList(context, controller, limitService);
           }),
         ),
       ),
@@ -96,77 +72,79 @@ class _HomeViewState extends State<HomeView> {
           const SizedBox(height: 16),
           const Text(
             '등록된 사업장이 없습니다',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey,
-            ),
+            style: TextStyle(fontSize: 18, color: Colors.grey),
           ),
           const SizedBox(height: 8),
           const Text(
             '새로운 사업장을 추가해보세요',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildWorkplaceList(BuildContext context) {
+  Widget _buildWorkplaceList(
+      BuildContext context,
+      WorkplaceController controller,
+      SubscriptionLimitService limitService,
+      ) {
+    // ✅ 실시간으로 isPremium 값 가져오기
+    final isPremium = limitService.currentLimits.value?.isPremium ?? false;
+
+    print('📊 사업장 목록 렌더링 - 프리미엄: $isPremium, 사업장 수: ${controller.workplaces.length}');
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: controller.workplaces.length,
       itemBuilder: (context, index) {
         final workplace = controller.workplaces[index];
-        return _buildWorkplaceCard(workplace, index, context);
+        final isLocked = !isPremium && index >= 1;
+
+        return _buildWorkplaceCard(
+          workplace,
+          index,
+          context,
+          isLocked,
+          controller,
+        );
       },
     );
   }
 
-  Widget _buildWorkplaceCard(workplace, int index, BuildContext context) {
-    final isPremium = subscriptionLimits?.isPremium ?? false;
-
-    // ✅ 순방향으로 계산: 첫 번째 사업장(index 0)만 활성화
-    final isLocked = !isPremium && index > 0;
-
+  Widget _buildWorkplaceCard(
+      dynamic workplace,
+      int index,
+      BuildContext context,
+      bool isLocked,
+      WorkplaceController controller,
+      ) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Stack(
         children: [
           InkWell(
-            onTap: isLocked ? () => _showUpgradeDialog(workplace: workplace) : () {
-              Get.toNamed(AppRoutes.workplaceDetail, arguments: workplace);
+            onTap: isLocked
+                ? () => _showUpgradeDialog(workplace: workplace)
+                : () {
+              Get.toNamed(
+                AppRoutes.workplaceDetail,
+                arguments: workplace,
+              );
             },
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 헤더 (이름 + 메뉴)
                   Row(
                     children: [
-                      // 아이콘 박스
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Theme.of(context).primaryColor,
-                              Theme.of(context).primaryColor.withOpacity(0.7),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(
-                          Icons.store,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,7 +159,8 @@ class _HomeViewState extends State<HomeView> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              DateFormat('yyyy.MM.dd 등록').format(workplace.createdAt),
+                              DateFormat('yyyy.MM.dd 등록')
+                                  .format(workplace.createdAt),
                               style: TextStyle(
                                 fontSize: 13,
                                 color: Colors.grey[600],
@@ -191,22 +170,21 @@ class _HomeViewState extends State<HomeView> {
                           ],
                         ),
                       ),
-
-                      // PopupMenuButton (잠금 상태에서는 비활성화)
                       if (!isLocked)
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          onSelected: (value) => _handleMenuSelection(value, workplace.id),
+                          onSelected: (value) =>
+                              _handleMenuSelection(value, workplace.id, controller),
                           itemBuilder: (context) => [
                             const PopupMenuItem(
                               value: 'edit',
                               child: Row(
                                 children: [
                                   Icon(Icons.edit, size: 18),
-                                  SizedBox(width: 10),
+                                  SizedBox(width: 8),
                                   Text('이름 수정'),
                                 ],
                               ),
@@ -215,8 +193,8 @@ class _HomeViewState extends State<HomeView> {
                               value: 'delete',
                               child: Row(
                                 children: [
-                                  Icon(Icons.delete, color: Colors.red, size: 18),
-                                  SizedBox(width: 10),
+                                  Icon(Icons.delete, size: 18, color: Colors.red),
+                                  SizedBox(width: 8),
                                   Text('삭제', style: TextStyle(color: Colors.red)),
                                 ],
                               ),
@@ -227,24 +205,23 @@ class _HomeViewState extends State<HomeView> {
                   ),
 
                   const SizedBox(height: 16),
-                  const Divider(height: 1),
-                  const SizedBox(height: 16),
 
                   // 통계 정보
                   Obx(() {
-                    final employeeCount = controller.getEmployeeCount(workplace.id);
-                    final monthlySalary = controller.getMonthlySalary(workplace.id);
+                    final employeeCount = controller.employeeCountMap[workplace.id] ?? 0;
+                    final monthlySalary = controller.monthlySalaryMap[workplace.id] ?? 0;
 
                     return Row(
                       children: [
-                        // 직원 칩
                         Expanded(
                           child: _buildClickableStatChip(
-                            icon: Icons.people_outline,
+                            icon: Icons.people,
                             label: '직원',
-                            value: '$employeeCount명',
-                            color: Theme.of(context).primaryColor,
-                            onTap: isLocked ? null : () {
+                            value: '${employeeCount}명',
+                            color: AppTheme.primaryColor,
+                            onTap: isLocked
+                                ? null
+                                : () {
                               Get.toNamed(
                                 AppRoutes.employeeList,
                                 arguments: workplace,
@@ -252,17 +229,18 @@ class _HomeViewState extends State<HomeView> {
                             },
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        // 이번 달 급여 칩
+                        const SizedBox(width: 8),
                         Expanded(
                           child: _buildClickableStatChip(
-                            icon: Icons.calendar_today_outlined,
-                            label: '이번 달',
+                            icon: Icons.attach_money,
+                            label: '이번 달 급여',
                             value: monthlySalary > 0
                                 ? '${NumberFormat('#,###').format(monthlySalary)}원'
                                 : '-',
                             color: AppTheme.successColor,
-                            onTap: isLocked ? null : () {
+                            onTap: isLocked
+                                ? null
+                                : () {
                               final now = DateTime.now();
                               Get.toNamed(
                                 AppRoutes.monthlySalarySummary,
@@ -300,7 +278,7 @@ class _HomeViewState extends State<HomeView> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.lock,
                             color: Colors.white,
                             size: 48,
@@ -386,132 +364,89 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  void _handleMenuSelection(String value, String workplaceId) {
+  void _handleMenuSelection(
+      String value,
+      String workplaceId,
+      WorkplaceController controller,
+      ) {
     switch (value) {
       case 'edit':
-        _showEditWorkplaceDialog(workplaceId);
+        _showEditWorkplaceDialog(workplaceId, controller);
         break;
       case 'delete':
-        _showDeleteConfirmDialog(workplaceId);
+        _showDeleteConfirmDialog(workplaceId, controller);
         break;
     }
   }
 
-  void _showEditWorkplaceDialog(String workplaceId) {
-    final workplace = controller.workplaces.firstWhere((w) => w.id == workplaceId);
-    final TextEditingController nameController = TextEditingController(text: workplace.name);
+  void _showEditWorkplaceDialog(
+      String workplaceId,
+      WorkplaceController controller,
+      ) {
+    final workplace =
+    controller.workplaces.firstWhere((w) => w.id == workplaceId);
+    final TextEditingController nameController =
+    TextEditingController(text: workplace.name);
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('사업장 이름 수정'),
-          content: TextField(
-            controller: nameController,
-            decoration: const InputDecoration(
-              labelText: '사업장 이름',
-            ),
-            autofocus: true,
+    Get.dialog(
+      AlertDialog(
+        title: const Text('사업장 이름 수정'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(labelText: '사업장 이름'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('취소'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final newName = nameController.text.trim();
-                if (newName.isNotEmpty) {
-                  Navigator.of(context).pop();
-                  await Future.delayed(const Duration(milliseconds: 200));
-                  await controller.updateWorkplaceName(workplaceId, newName);
-                }
-              },
-              child: const Text('수정'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showDeleteConfirmDialog(String workplaceId) {
-    final workplace = controller.workplaces.firstWhere((w) => w.id == workplaceId);
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('사업장 삭제'),
-          content: Text('\'${workplace.name}\' 사업장을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('취소'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
+          ElevatedButton(
+            onPressed: () async {
+              final newName = nameController.text.trim();
+              if (newName.isNotEmpty) {
+                Get.back();
                 await Future.delayed(const Duration(milliseconds: 200));
-                await controller.deleteWorkplace(workplaceId);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('삭제'),
-            ),
-          ],
-        );
-      },
+                await controller.updateWorkplaceName(workplaceId, newName);
+              }
+            },
+            child: const Text('수정'),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildStatChip({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: color.withOpacity(0.8),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    value,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
+  void _showDeleteConfirmDialog(
+      String workplaceId,
+      WorkplaceController controller,
+      ) {
+    final workplace =
+    controller.workplaces.firstWhere((w) => w.id == workplaceId);
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('사업장 삭제'),
+        content: Text(
+            '\'${workplace.name}\' 사업장을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Get.back();
+              await Future.delayed(const Duration(milliseconds: 200));
+              await controller.deleteWorkplace(workplaceId);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
             ),
-          ],
-        ),
+            child: const Text('삭제'),
+          ),
+        ],
       ),
     );
   }
@@ -520,7 +455,6 @@ class _HomeViewState extends State<HomeView> {
     Get.dialog(AddWorkplaceDialog());
   }
 
-  // 업그레이드 다이얼로그
   void _showUpgradeDialog({dynamic workplace}) {
     Get.dialog(
       AlertDialog(
@@ -582,7 +516,8 @@ class _HomeViewState extends State<HomeView> {
                 OutlinedButton(
                   onPressed: () {
                     Get.back();
-                    _showDeleteConfirmDialog(workplace.id);
+                    final controller = Get.find<WorkplaceController>();
+                    _showDeleteConfirmDialog(workplace.id, controller);
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.red,
@@ -591,7 +526,6 @@ class _HomeViewState extends State<HomeView> {
                   ),
                   child: const Text('삭제'),
                 ),
-
               OutlinedButton(
                 onPressed: () => Get.back(),
                 style: OutlinedButton.styleFrom(
@@ -599,7 +533,6 @@ class _HomeViewState extends State<HomeView> {
                 ),
                 child: const Text('취소'),
               ),
-
               ElevatedButton(
                 onPressed: () {
                   Get.back();
@@ -629,10 +562,7 @@ class _HomeViewState extends State<HomeView> {
         children: [
           Icon(Icons.check, color: Colors.amber[700], size: 16),
           const SizedBox(width: 4),
-          Text(
-            text,
-            style: const TextStyle(fontSize: 13),
-          ),
+          Text(text, style: const TextStyle(fontSize: 13)),
         ],
       ),
     );

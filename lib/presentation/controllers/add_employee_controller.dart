@@ -236,8 +236,6 @@ class AddEmployeeController extends GetxController {
     }
   }
 
-  // lib/presentation/controllers/add_employee_controller.dart
-
   /// 직원 추가 한도 초과 다이얼로그
   void _showEmployeeLimitDialog(Map<String, dynamic> checkResult) {
     final currentCount = checkResult['current_count'] as int;
@@ -331,9 +329,15 @@ class AddEmployeeController extends GetxController {
           ),
           if (tier == 'free')
             ElevatedButton(
-              onPressed: () {
-                Get.back();
-                Get.toNamed('/account-settings');
+              onPressed: () async {
+                Get.back(); // 다이얼로그 닫기
+
+                // ✅ 설정 화면으로 이동하고 돌아올 때까지 대기
+                await Get.toNamed('/account-settings');
+
+                // ✅ 설정 화면에서 돌아온 후 구독 상태 새로고침
+                print('🔄 설정 화면에서 복귀 - 구독 상태 새로고침');
+                await _limitService.getUserSubscriptionLimits();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.amber[600],

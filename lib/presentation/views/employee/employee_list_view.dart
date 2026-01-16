@@ -67,6 +67,11 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
             },
           );
 
+          // ✅ 직원 추가 화면에서 돌아온 후 구독 정보 새로고침
+          print('🔄 직원 추가 화면에서 복귀 - 구독 정보 새로고침');
+          final limitService = Get.find<SubscriptionLimitService>();
+          await limitService.getUserSubscriptionLimits();
+
           if (result != null && result['success'] == true) {
             await controller.loadEmployees();
             SnackbarHelper.showSuccess(
