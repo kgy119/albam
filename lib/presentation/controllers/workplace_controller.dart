@@ -46,6 +46,9 @@ class WorkplaceController extends GetxController {
     try {
       isAdding.value = true;
 
+      // ✅ 최신 구독 상태를 다시 가져옴
+      await _limitService.getUserSubscriptionLimits();
+
       // 1. 사업장 추가 가능 여부 확인
       final canAdd = await _limitService.canAddWorkplace();
 
