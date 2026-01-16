@@ -272,7 +272,6 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
                           InkWell(
                             onTap: isLocked ? null : () {
                               Clipboard.setData(ClipboardData(text: employee.accountNumber!));
-                              SnackbarHelper.showCopied('계좌번호가 복사되었습니다.');
                             },
                             child: Row(
                               children: [
@@ -446,7 +445,9 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
           ],
         ),
     );
-  }void _showEditDialog(employee) async {
+  }
+
+  void _showEditDialog(employee) async {
     final latestEmployee = await controller.getLatestEmployeeInfo(employee.id);
     if (latestEmployee == null) {
       SnackbarHelper.showError('직원 정보를 불러올 수 없습니다.');
@@ -454,14 +455,17 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
     }
 
     final result = await Get.toNamed(
-      '/edit-employee',
-      arguments: latestEmployee,
+      AppRoutes.editEmployee,
+      arguments: {
+        'employee': latestEmployee,
+      },
     );
 
     if (result == true) {
       await controller.loadEmployees();
     }
   }
+
   void _showSalaryDialog(employee) {
     final now = DateTime.now();
     int selectedYear = now.year;

@@ -128,10 +128,8 @@ class _HomeViewState extends State<HomeView> {
   Widget _buildWorkplaceCard(workplace, int index, BuildContext context) {
     final isPremium = subscriptionLimits?.isPremium ?? false;
 
-    // ✅ 역순으로 계산: 마지막 사업장(가장 오래된 것)만 활성화
-    final totalWorkplaces = controller.workplaces.length;
-    final isFirstWorkplace = (index == totalWorkplaces - 1);
-    final isLocked = !isPremium && !isFirstWorkplace;
+    // ✅ 순방향으로 계산: 첫 번째 사업장(index 0)만 활성화
+    final isLocked = !isPremium && index > 0;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -575,29 +573,49 @@ class _HomeViewState extends State<HomeView> {
           ],
         ),
         actions: [
-          if (workplace != null)
-            TextButton(
-              onPressed: () {
-                Get.back();
-                _showDeleteConfirmDialog(workplace.id);
-              },
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('삭제'),
-            ),
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('취소'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              Get.toNamed(AppRoutes.accountSettings);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber[600],
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('구독하기'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.end,
+            children: [
+              if (workplace != null)
+                OutlinedButton(
+                  onPressed: () {
+                    Get.back();
+                    _showDeleteConfirmDialog(workplace.id);
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                    minimumSize: const Size(72, 44),
+                  ),
+                  child: const Text('삭제'),
+                ),
+
+              OutlinedButton(
+                onPressed: () => Get.back(),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(72, 44),
+                ),
+                child: const Text('취소'),
+              ),
+
+              ElevatedButton(
+                onPressed: () {
+                  Get.back();
+                  Get.toNamed(AppRoutes.accountSettings);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber[600],
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(96, 44),
+                ),
+                child: const Text(
+                  '구독하기',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ),
         ],
       ),

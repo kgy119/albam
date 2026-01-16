@@ -123,9 +123,28 @@ class AuthService extends GetxService {
       );
 
       return {'success': true};
+    } on AuthException catch (e) {
+      print('이메일 로그인 AuthException: ${e.message}');
+
+      // ✅ 이메일 미인증 에러 감지
+      if (e.message.contains('Email not confirmed')) {
+        return {
+          'success': false,
+          'error': '이메일 인증이 필요합니다.',
+          'isEmailNotConfirmed': true,
+        };
+      }
+
+      return {
+        'success': false,
+        'error': _getErrorMessage(e.message),
+      };
     } catch (e) {
       print('이메일 로그인 오류: $e');
-      return {'success': false, 'error': _getErrorMessage(e)};
+      return {
+        'success': false,
+        'error': _getErrorMessage(e),
+      };
     }
   }
 
@@ -257,6 +276,30 @@ class AuthService extends GetxService {
     }
   }
 
+
+/* -------------------------------------------------------------------------- */
+/*                          EMAIL VERIFICATION                                */
+/* -------------------------------------------------------------------------- */
+
+  /// 이메일 인증 메일 재전송
+  Future<Map<String, dynamic>> resendVerificationEmail(String email) async {
+    try {
+      await _supabase.auth.resend(
+        type: OtpType.signup,
+        email: email.trim(),
+      );
+
+      print('인증 메일 재전송 완료: $email');
+      return {'success': true};
+    } catch (e) {
+      print('이메일 재전송 오류: $e');
+      return {
+        'success': false,
+        'error': '메일 재전송에 실패했습니다.',
+      };
+    }
+  }
+
   /* -------------------------------------------------------------------------- */
   /*                                   UTILS                                    */
   /* -------------------------------------------------------------------------- */
@@ -279,3 +322,5 @@ class AuthService extends GetxService {
   String? get userId => currentUser.value?.id;
   String? get userEmail => currentUser.value?.email;
 }
+
+

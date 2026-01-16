@@ -12,7 +12,6 @@ import '../../../core/services/subscription_limit_service.dart';
 import '../../../app/routes/app_routes.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/utils/snackbar_helper.dart';
-import '../../../data/models/subscription_limits_model.dart';
 
 class AccountSettingsView extends StatefulWidget {
   const AccountSettingsView({super.key});
@@ -23,8 +22,6 @@ class AccountSettingsView extends StatefulWidget {
 
 class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsBindingObserver {
   String appVersion = '로딩 중...';
-  SubscriptionLimits? subscriptionLimits;
-  bool isLoadingLimits = true;
 
   late SubscriptionService subscriptionService;
   late SubscriptionLimitService limitService;
@@ -32,15 +29,14 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this); // ✅ 추가
-    _loadAppVersion();
+    WidgetsBinding.instance.addObserver(this);
     _initServices();
-    _loadSubscriptionInfo();
+    _loadAppVersion();
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this); // ✅ 추가
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -49,59 +45,36 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       print('📱 앱이 포어그라운드로 돌아옴 - 구독 정보 새로고침');
-      _loadSubscriptionInfo();
+      _refreshSubscriptionInfo();
     }
   }
 
-  Future<void> _initServices() async {
-    subscriptionService = Get.put(SubscriptionService());
-    limitService = Get.put(SubscriptionLimitService());
-    await subscriptionService.onInit();
+  void _initServices() {
+    subscriptionService = Get.find<SubscriptionService>();
+    limitService = Get.find<SubscriptionLimitService>();
   }
 
   Future<void> _loadAppVersion() async {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
-      setState(() {
-        appVersion = '${packageInfo.version} (${packageInfo.buildNumber})';
-      });
+      if (mounted) {
+        setState(() {
+          appVersion = '${packageInfo.version} (${packageInfo.buildNumber})';
+        });
+      }
     } catch (e) {
-      setState(() {
-        appVersion = '1.0.0';
-      });
+      if (mounted) {
+        setState(() {
+          appVersion = '1.0.0';
+        });
+      }
     }
   }
 
-  Future<void> _loadSubscriptionInfo() async {
-    setState(() {
-      isLoadingLimits = true;
-    });
-
-    try {
-      print('🔄 구독 정보 새로고침 시작');
-
-      // ✅ 먼저 SubscriptionService 새로고침
-      await subscriptionService.loadCurrentSubscription();
-
-      // ✅ 그 다음 한도 정보 새로고침
-      final limits = await limitService.getUserSubscriptionLimits();
-
-      setState(() {
-        subscriptionLimits = limits;
-        isLoadingLimits = false;
-      });
-
-      print('✅ 구독 정보 새로고침 완료');
-      print('   tier: ${subscriptionLimits?.tier}');
-      print('   isPremium: ${subscriptionLimits?.isPremium}');
-    } catch (e) {
-      print('❌ 구독 정보 로드 오류: $e');
-      setState(() {
-        isLoadingLimits = false;
-      });
-    }
+  Future<void> _refreshSubscriptionInfo() async {
+    await subscriptionService.loadCurrentSubscription();
+    await limitService.getUserSubscriptionLimits();
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -109,111 +82,108 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
     final authService = Get.find<AuthService>();
 
     return Scaffold(
-        appBar: AppBar(
-          title: const Text('설정'),
-        ),
-        body: Obx(() {
-          // ✅ 구독 정보 로딩 중
-          if (limitService.isLoading.value) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      appBar: AppBar(
+        title: const Text('설정'),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refreshSubscriptionInfo,
+        child: ListView(
+          children: [
+            // 📱 계정 정보 섹션
+            _buildSectionHeader('계정 정보'),
 
-          return RefreshIndicator(
-            onRefresh: () async {
-              await subscriptionService.loadCurrentSubscription();
-              await limitService.getUserSubscriptionLimits();
-            },
-            child: ListView(
-              children: [
-                // 📱 계정 정보 섹션
-                _buildSectionHeader('계정 정보'),
-                _buildAccountCard(authService),
+            // ✅ Obx로 실시간 구독 상태 관찰
+            Obx(() => _buildAccountCard(authService)),
 
-                const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-                // 📋 앱 정보 섹션
-                _buildSectionHeader('앱 정보'),
-                Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      ListTile(
-                        leading: const Icon(Icons.info_outline),
-                        title: const Text('버전 정보'),
-                        trailing: Text(
-                          appVersion,
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.description_outlined),
-                        title: const Text('이용약관'),
-                        trailing: const Icon(Icons.chevron_right, size: 20),
-                        onTap: () {
-                          SnackbarHelper.showInfo('이용약관 페이지를 준비중입니다.',
-                              title: '준비중');
-                        },
-                      ),
-                      const Divider(height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.privacy_tip_outlined),
-                        title: const Text('개인정보처리방침'),
-                        trailing: const Icon(Icons.chevron_right, size: 20),
-                        onTap: () {
-                          SnackbarHelper.showInfo('개인정보처리방침 페이지를 준비중입니다.',
-                              title: '준비중');
-                        },
-                      ),
-                    ],
+            // 📋 앱 정보 섹션
+            _buildSectionHeader('앱 정보'),
+            Card(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.description_outlined),
+                    title: const Text('이용약관'),
+                    trailing: const Icon(Icons.chevron_right, size: 20),
+                    onTap: () => _openWebPage('https://albamanager.kr/terms.html'),
                   ),
-                ),
-
-                const SizedBox(height: 32),
-
-                // 🚪 로그아웃
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showLogoutDialog(context, authService),
-                    icon: const Icon(Icons.logout),
-                    label: const Text('로그아웃'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: BorderSide(color: Colors.grey[400]!),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.privacy_tip_outlined),
+                    title: const Text('개인정보처리방침'),
+                    trailing: const Icon(Icons.chevron_right, size: 20),
+                    onTap: () => _openWebPage('https://albamanager.kr/privacy.html'),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.info_outline),
+                    title: const Text('버전 정보'),
+                    trailing: Text(
+                      appVersion,
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // ⚠️ 회원탈퇴
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: OutlinedButton.icon(
-                    onPressed: () =>
-                        _showDeleteAccountDialog(context, accountService),
-                    icon: const Icon(Icons.delete_forever, color: Colors.red),
-                    label: const Text(
-                      '회원탈퇴',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: Colors.red),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-              ],
+                ],
+              ),
             ),
-          );
-        }),
+
+            const SizedBox(height: 32),
+
+            // 🚪 로그아웃
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: OutlinedButton.icon(
+                onPressed: () => _showLogoutDialog(context, authService),
+                icon: const Icon(Icons.logout),
+                label: const Text('로그아웃'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: BorderSide(color: Colors.grey[400]!),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // ⚠️ 회원탈퇴
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: OutlinedButton.icon(
+                onPressed: () => _showDeleteAccountDialog(context, accountService),
+                icon: const Icon(Icons.delete_forever, color: Colors.red),
+                label: const Text(
+                  '회원탈퇴',
+                  style: TextStyle(color: Colors.red),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: const BorderSide(color: Colors.red),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
     );
+  }
+
+  Future<void> _openWebPage(String url) async {
+    try {
+      await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (e) {
+      print('URL 열기 오류: $e');
+      SnackbarHelper.showError('페이지를 열 수 없습니다.');
+    }
   }
 
   Widget _buildSectionHeader(String title) {
@@ -233,10 +203,10 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
   Widget _buildAccountCard(AuthService authService) {
     final user = authService.currentUser.value;
     final email = user?.email ?? '이메일 없음';
-    final isPremium = subscriptionLimits?.isPremium ?? false;
 
-    // 구독 상태 확인
+    // ✅ SubscriptionService의 Rx 변수에서 직접 가져오기
     final subscription = subscriptionService.currentSubscription.value;
+    final isPremium = subscription?.tier == 'premium' && (subscription?.isActive ?? false);
     final isCancelled = subscription != null &&
         subscription.tier == 'premium' &&
         subscription.autoRenew == false;
@@ -644,91 +614,43 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
     try {
       print('💳 구독 시작');
 
-      // 로딩 표시
-      Get.dialog(
-        const Center(child: CircularProgressIndicator()),
-        barrierDismissible: false,
-      );
-
       final success = await subscriptionService.purchaseSubscription();
-
-      // ✅ 로딩 닫기
-      if (Get.isDialogOpen ?? false) {
-        Navigator.of(Get.overlayContext!).pop();
-      }
 
       print('✅ 구독 처리 완료 - 결과: $success');
 
-      // ✅ 구독 창이 닫힌 후 여기로 돌아옴
-      // 1초 대기 후 새로고침 (구독 처리 시간 고려)
+      // ✅ 1초 대기 후 상태 확인 (Obx가 자동으로 UI 업데이트)
       await Future.delayed(const Duration(seconds: 1));
 
       print('🔄 구독 상태 확인 중...');
-      await _refreshSubscriptionStatus();
+      await _refreshSubscriptionInfo();
 
-    } catch (e) {
-      print('❌ 오류: $e');
+      // ✅ 프리미엄 확인 후 메시지 표시
+      final isPremium = subscriptionService.currentSubscription.value?.tier == 'premium' &&
+          (subscriptionService.currentSubscription.value?.isActive ?? false);
 
-      // 오류 시 로딩 닫기
-      if (Get.isDialogOpen ?? false) {
-        Get.back();
-      }
-
-      SnackbarHelper.showError('오류가 발생했습니다.');
-    }
-  }
-
-// ✅ 구독 상태 새로고침 메서드 추가
-  Future<void> _refreshSubscriptionStatus() async {
-    try {
-      setState(() {
-        isLoadingLimits = true;
-      });
-
-      // 1. SubscriptionService 새로고침
-      await subscriptionService.loadCurrentSubscription();
-
-      // 2. SubscriptionLimitService 새로고침
-      final limits = await limitService.getUserSubscriptionLimits();
-
-      setState(() {
-        subscriptionLimits = limits;
-        isLoadingLimits = false;
-      });
-
-      print('✅ 새로고침 완료');
-      print('   tier: ${subscriptionLimits?.tier}');
-      print('   isPremium: ${subscriptionLimits?.isPremium}');
-
-      // ✅ 프리미엄으로 변경되었으면 성공 메시지
-      if (subscriptionLimits?.isPremium == true) {
+      if (isPremium) {
         SnackbarHelper.showSuccess(
           '🎉 프리미엄 구독이 완료되었습니다!\n모든 기능을 이용할 수 있습니다.',
         );
       }
     } catch (e) {
-      print('❌ 새로고침 오류: $e');
-      setState(() {
-        isLoadingLimits = false;
-      });
+      print('❌ 오류: $e');
+      SnackbarHelper.showError('오류가 발생했습니다.');
     }
   }
 
   // 구독 관리 처리
   Future<void> _handleManageSubscription() async {
-    // ✅ 먼저 안내 다이얼로그 표시
     _showManageSubscriptionDialog();
   }
 
-// 구독 관리 안내 다이얼로그
+  // 구독 관리 안내 다이얼로그
   void _showManageSubscriptionDialog() {
     final subscriptionPlatform = subscriptionService.currentSubscription.value?.platform;
     final currentPlatform = Theme.of(context).platform;
 
     print('📱 구독 플랫폼: $subscriptionPlatform');
 
-
-    // ✅ 구독 플랫폼 우선, 없으면 현재 플랫폼
     final isIOS = subscriptionPlatform == 'ios' ||
         (subscriptionPlatform == null && currentPlatform == TargetPlatform.iOS);
 
@@ -795,15 +717,15 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
                         children: [
                           Icon(Icons.check_circle, color: Colors.green[700], size: 20),
                           const SizedBox(width: 8),
-                          const Expanded(  // ✅ Expanded 추가
+                          const Expanded(
                             child: Text(
                               '데이터는 안전하게 보관됩니다',
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
                               ),
-                              maxLines: 2,  // ✅ 추가
-                              overflow: TextOverflow.ellipsis,  // ✅ 추가
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -840,15 +762,15 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
                         children: [
                           Icon(Icons.warning_amber, color: Colors.orange[700], size: 20),
                           const SizedBox(width: 8),
-                          const Expanded(  // ✅ Expanded 추가
+                          const Expanded(
                             child: Text(
                               '구독 만료 후 무료 회원 제한',
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
                               ),
-                              maxLines: 2,  // ✅ 추가
-                              overflow: TextOverflow.ellipsis,  // ✅ 추가
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -881,7 +803,7 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
                     children: [
                       Icon(Icons.replay, color: Colors.blue[700], size: 20),
                       const SizedBox(width: 8),
-                      Expanded(  // ✅ Expanded 추가
+                      Expanded(
                         child: Text(
                           '재구독 시 모든 데이터 즉시 복원',
                           style: TextStyle(
@@ -889,8 +811,8 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
                             fontWeight: FontWeight.w600,
                             color: Colors.blue[900],
                           ),
-                          maxLines: 2,  // ✅ 최대 2줄
-                          overflow: TextOverflow.ellipsis,  // ✅ 넘치면 ... 표시
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -963,17 +885,15 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
     );
   }
 
-// 스토어 열기
+  // 스토어 열기
   Future<void> _openStore() async {
     try {
-      // ✅ 구독 정보에서 플랫폼 확인
       final subscriptionPlatform = subscriptionService.currentSubscription.value?.platform;
 
       print('📱 스토어 열기');
       print('   구독 플랫폼: $subscriptionPlatform');
       print('   현재 기기: ${Theme.of(context).platform}');
 
-      // ✅ 구독한 플랫폼으로 연결
       if (subscriptionPlatform == 'ios') {
         print('🍎 iOS 구독 → App Store로 이동');
         await _openIOSSubscription();
@@ -981,10 +901,8 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
         print('🤖 Android 구독 → Google Play로 이동');
         await _openAndroidSubscription();
       } else {
-        // 구독 정보가 없으면 현재 플랫폼으로
         print('⚠️ 구독 플랫폼 정보 없음, 현재 기기 플랫폼 사용');
         final currentPlatform = Theme.of(context).platform;
-
         if (currentPlatform == TargetPlatform.android) {
           await _openAndroidSubscription();
         } else if (currentPlatform == TargetPlatform.iOS) {
@@ -996,16 +914,12 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
       SnackbarHelper.showError('스토어를 열 수 없습니다.');
     }
   }
-
 // Android 구독 관리
   Future<void> _openAndroidSubscription() async {
-    // ✅ iOS에서는 안내 다이얼로그만 표시
     if (Platform.isIOS) {
       _showAndroidSubscriptionGuide();
       return;
     }
-
-    // Android에서는 Google Play 열기 시도
     try {
       final specificUrl = Uri.parse(
           'https://play.google.com/store/account/subscriptions?'
@@ -1043,17 +957,12 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
       _showAndroidSubscriptionGuide();
     }
   }
-
-
 // iOS 구독 관리
   Future<void> _openIOSSubscription() async {
-    // ✅ Android에서는 안내 다이얼로그만 표시
     if (Platform.isAndroid) {
       _showIOSSubscriptionGuide();
       return;
     }
-
-    // iOS에서는 App Store 열기 시도
     try {
       final settingsUrl = Uri.parse('https://apps.apple.com/account/subscriptions');
 
@@ -1074,201 +983,194 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
       _showIOSSubscriptionGuide();
     }
   }
-
-
-  // iOS 구독 안내 다이얼로그
+// iOS 구독 안내 다이얼로그
   void _showIOSSubscriptionGuide() {
     showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.apple, color: Colors.black),
-            const SizedBox(width: 8),
-            const Text('Apple 구독 관리'),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'iOS 기기에서 구독을 관리할 수 있습니다.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.blue[900],
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              const Text(
-                'iOS 기기에서 구독 관리 방법:',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _buildManualStep('1', '설정 앱 열기'),
-              _buildManualStep('2', '[사용자 이름] 탭'),
-              _buildManualStep('3', '"구독" 선택'),
-              _buildManualStep('4', '"알바관리" 앱 찾기'),
-              _buildManualStep('5', '구독 취소 또는 변경'),
-
-              const SizedBox(height: 16),
-
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.green[700], size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '구독을 취소해도 현재 결제 기간이\n끝날 때까지 프리미엄 혜택이 유지됩니다.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[700],
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const Icon(Icons.apple, color: Colors.black),
+              const SizedBox(width: 8),
+              const Text('Apple 구독 관리'),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('확인'),
+          content: SingleChildScrollView(
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+            Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'iOS 기기에서 구독을 관리할 수 있습니다.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.blue[900],
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+          const SizedBox(height: 16),
+                  const Text(
+                    'iOS 기기에서 구독 관리 방법:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildManualStep('1', '설정 앱 열기'),
+                  _buildManualStep('2', '[사용자 이름] 탭'),
+                  _buildManualStep('3', '"구독" 선택'),
+                  _buildManualStep('4', '"알바관리" 앱 찾기'),
+                  _buildManualStep('5', '구독 취소 또는 변경'),
+
+                  const SizedBox(height: 16),
+
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green[700], size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '구독을 취소해도 현재 결제 기간이\n끝날 때까지 프리미엄 혜택이 유지됩니다.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[700],
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
     );
   }
-
-// Android 구독 안내 다이얼로그 (iOS 기기용)
+// Android 구독 안내 다이얼로그
   void _showAndroidSubscriptionGuide() {
     showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.android, color: Colors.green[700]),
-            const SizedBox(width: 8),
-            const Text('Google Play 구독 관리'),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Android 기기에서 구독을 관리할 수 있습니다.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.blue[900],
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              const Text(
-                'Android 기기에서 구독 관리 방법:',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _buildManualStep('1', 'Play 스토어 앱 열기'),
-              _buildManualStep('2', '프로필 아이콘 탭 (우측 상단)'),
-              _buildManualStep('3', '"결제 및 정기결제" 선택'),
-              _buildManualStep('4', '"정기결제" 탭에서 "알바관리" 찾기'),
-              _buildManualStep('5', '구독 취소 또는 변경'),
-
-              const SizedBox(height: 16),
-
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.green[700], size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '구독을 취소해도 현재 결제 기간이\n끝날 때까지 프리미엄 혜택이 유지됩니다.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[700],
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              Icon(Icons.android, color: Colors.green[700]),
+              const SizedBox(width: 8),
+              const Text('Google Play 구독 관리'),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('확인'),
+          content: SingleChildScrollView(
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+            Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue[200]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Android 기기에서 구독을 관리할 수 있습니다.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.blue[900],
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+          const SizedBox(height: 16),
+                  const Text(
+                    'Android 기기에서 구독 관리 방법:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildManualStep('1', 'Play 스토어 앱 열기'),
+                  _buildManualStep('2', '프로필 아이콘 탭 (우측 상단)'),
+                  _buildManualStep('3', '"결제 및 정기결제" 선택'),
+                  _buildManualStep('4', '"정기결제" 탭에서 "알바관리" 찾기'),
+                  _buildManualStep('5', '구독 취소 또는 변경'),
+
+                  const SizedBox(height: 16),
+
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green[700], size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '구독을 취소해도 현재 결제 기간이\n끝날 때까지 프리미엄 혜택이 유지됩니다.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[700],
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
     );
   }
-
-
 // 수동 단계 아이템
   Widget _buildManualStep(String number, String text) {
     return Padding(
@@ -1310,40 +1212,38 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
   }
   void _showLogoutDialog(BuildContext context, AuthService authService) {
     showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('로그아웃'),
-          content: const Text('로그아웃 하시겠습니까?'),
-          actions: [
-            TextButton(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext dialogContext) {
+          return AlertDialog(
+              title: const Text('로그아웃'),
+              content: const Text('로그아웃 하시겠습니까?'),
+              actions: [
+              TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('취소'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.of(dialogContext).pop();
+          child: const Text('취소'),
+          ),
+          ElevatedButton(
+          onPressed: () async {
+          Navigator.of(dialogContext).pop();
+          Get.dialog(
+            const Center(child: CircularProgressIndicator()),
+            barrierDismissible: false,
+          );
 
-                Get.dialog(
-                  const Center(child: CircularProgressIndicator()),
-                  barrierDismissible: false,
-                );
+          await Future.delayed(const Duration(milliseconds: 200));
+          await authService.signOut();
 
-                await Future.delayed(const Duration(milliseconds: 200));
-                await authService.signOut();
-
-                Get.back();
-                Get.offAllNamed(AppRoutes.login);
-              },
-              child: const Text('확인'),
-            ),
-          ],
-        );
-      },
+          Get.back();
+          Get.offAllNamed(AppRoutes.login);
+          },
+            child: const Text('확인'),
+          ),
+              ],
+          );
+        },
     );
   }
-
   void _showDeleteAccountDialog(
       BuildContext context,
       AccountService accountService,
@@ -1357,32 +1257,25 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
     );
   }
 }
-
-// 회원탈퇴 다이얼로그 (기존 코드 유지)
+// 회원탈퇴 다이얼로그
 class _DeleteAccountDialog extends StatefulWidget {
   final AccountService accountService;
-
   const _DeleteAccountDialog({required this.accountService});
-
   @override
   State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
 }
-
 class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
   late TextEditingController _reasonController;
-
   @override
   void initState() {
     super.initState();
     _reasonController = TextEditingController();
   }
-
   @override
   void dispose() {
     _reasonController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -1472,10 +1365,8 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
       ],
     );
   }
-
   Future<void> _handleDeleteAccount(BuildContext context) async {
     final reason = _reasonController.text.trim();
-
     Navigator.of(context).pop();
 
     Get.dialog(
@@ -1502,7 +1393,6 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
       SnackbarHelper.showError(result['error']);
     }
   }
-
   Widget _buildWarningItem(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),

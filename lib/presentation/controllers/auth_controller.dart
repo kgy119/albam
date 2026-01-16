@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import '../../core/services/auth_service.dart';
 import '../../app/routes/app_routes.dart';
 import '../../core/services/connectivity_service.dart';
+import '../views/auth/email_verification_guide_screen.dart';
+import '../views/auth/email_verification_pending_screen.dart';
 
 class AuthController extends GetxController {
   final AuthService _authService = Get.find<AuthService>();
@@ -169,15 +171,25 @@ class AuthController extends GetxController {
       errorMessage.value = '';
       successMessage.value = '';
 
+      final String userEmail = emailController.text.trim();
+
       final result = await _authService.signInWithEmail(
-        emailController.text.trim(),
+        userEmail,
         passwordController.text,
       );
 
       if (result['success'] == true) {
         successMessage.value = '로그인이 완료되었습니다.';
       } else if (result['error'] != null) {
-        errorMessage.value = result['error'];
+        // ✅ 이메일 미인증 에러 체크
+        if (result['error'].contains('Email not confirmed') ||
+            result['error'].contains('이메일 인증') ||
+            result['isEmailNotConfirmed'] == true) {
+          // 이메일 인증 대기 화면으로 이동
+          Get.to(() => EmailVerificationPendingScreen(email: userEmail));
+        } else {
+          errorMessage.value = result['error'];
+        }
       }
     } finally {
       isEmailLoading.value = false;
@@ -200,32 +212,21 @@ class AuthController extends GetxController {
       errorMessage.value = '';
       successMessage.value = '';
 
+      final String userEmail = emailController.text.trim();
+
       final result = await _authService.signUpWithEmail(
-        emailController.text.trim(),
+        userEmail,
         passwordController.text,
       );
 
       if (result['success'] == true) {
-        // ✅ 이메일 인증 안내 메시지로 변경
-        successMessage.value =
-        '회원가입 신청이 완료되었습니다!\n\n'
-            '${emailController.text.trim()} 으로 전송된\n'
-            '인증 이메일을 확인하고 링크를 클릭하여\n'
-            '이메일 인증을 완료해주세요.\n\n'
-            '인증 후 로그인할 수 있습니다.';
-
         // 이메일 입력란 비우기
         emailController.clear();
         passwordController.clear();
         passwordConfirmController.clear();
 
-        // 3초 후 로그인 모드로 전환
-        Future.delayed(const Duration(seconds: 5), () {
-          if (isSignUpMode.value) {
-            toggleSignUpMode();
-            successMessage.value = '';
-          }
-        });
+        // ✅ 이메일 인증 안내 화면으로 이동
+        Get.off(() => EmailVerificationGuideScreen(email: userEmail));
       } else if (result['error'] != null) {
         errorMessage.value = result['error'];
       }

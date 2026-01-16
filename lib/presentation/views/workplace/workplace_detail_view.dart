@@ -232,8 +232,39 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
     return Obx(() {
       final todaySchedules = controller.getDaySchedules(now.day);
 
+      // ✅ 스케줄이 없을 때 안내 메시지 표시
       if (todaySchedules.isEmpty) {
-        return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.event_busy,
+                  color: Colors.grey[400],
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '[오늘 ${now.day}일] 스케줄이 없습니다',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
       }
 
       final currentTime = TimeOfDay.now();
