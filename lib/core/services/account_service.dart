@@ -77,17 +77,6 @@ class AccountService extends GetxService {
         print('사업장 삭제 완료: $workplaceId');
       }
 
-      // 3. 탈퇴 사유 저장 (선택)
-      if (reason != null && reason.isNotEmpty) {
-        try {
-          await _supabase.from(SupabaseConfig.usersTable).update({
-            'delete_reason': reason.trim(),
-          }).eq('id', userId);
-        } catch (e) {
-          print('탈퇴 사유 저장 오류 (무시): $e');
-        }
-      }
-
       // 4. users 테이블 삭제 (✅ RPC 함수 사용)
       await _supabase.rpc('delete_user_account', params: {
         'user_id': userId,

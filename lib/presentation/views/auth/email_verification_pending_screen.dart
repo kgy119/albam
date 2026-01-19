@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../app/routes/app_routes.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/utils/snackbar_helper.dart';
 
@@ -37,7 +38,7 @@ class _EmailVerificationPendingScreenState
     _authSubscription = _authService.currentUser.listen((user) {
       if (user != null && mounted) {
         // 인증 완료되어 로그인되면 홈으로 이동
-        Get.offAllNamed('/home');
+        Get.offAllNamed(AppRoutes.home); // ✅ 수정
       }
     });
   }

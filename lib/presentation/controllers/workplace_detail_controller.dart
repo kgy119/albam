@@ -36,6 +36,13 @@ class WorkplaceDetailController extends GetxController {
   Rx<Map<String, dynamic>> monthlyStats = Rx<Map<String, dynamic>>({});
   RxBool isLoadingStats = false.obs;
 
+  // 퇴사 직원 목록 추가
+  RxList<Employee> resignedEmployees = <Employee>[].obs;
+  RxBool isLoadingResignedEmployees = false.obs;
+
+  List<Employee> get allEmployees => [...employees, ...resignedEmployees];
+
+
   @override
   void onInit() {
     super.onInit();
@@ -65,13 +72,70 @@ class WorkplaceDetailController extends GetxController {
     try {
       // 직원 목록 로드
       await loadEmployees();
-
-      // 현재 월 스케줄 로드
+      await loadResignedEmployees();
       await loadMonthlySchedules();
 
       print('초기 데이터 로드 완료');
     } catch (e) {
       print('초기 데이터 로드 오류: $e');
+    }
+  }
+
+  // ✅ 퇴사 직원 목록 로드
+  Future<void> loadResignedEmployees() async {
+    isLoadingResignedEmployees.value = true;
+
+    try {
+      print('퇴사 직원 조회 시작: ${workplace.id}');
+
+      resignedEmployees.value =
+      await _employeeService.getResignedEmployees(workplace.id);
+
+      print('퇴사 직원 목록 로드 완료: ${resignedEmployees.length}명');
+    } catch (e) {
+      print('퇴사 직원 목록 로드 오류: $e');
+      resignedEmployees.value = [];
+      SnackbarHelper.showError('퇴사 직원 목록을 불러오는데 실패했습니다.');
+    } finally {
+      isLoadingResignedEmployees.value = false;
+    }
+  }
+
+// ✅ 퇴사 처리 (수정)
+  Future<void> resignEmployee(String employeeId) async {
+    try {
+      await _employeeService.resignEmployee(employeeId);
+
+      // 목록 갱신
+      await loadEmployees();
+      await loadResignedEmployees();
+
+      // ✅ 통계 재계산
+      await calculateMonthlyStats();
+
+      SnackbarHelper.showSuccess('퇴사 처리되었습니다.');
+    } catch (e) {
+      print('퇴사 처리 오류: $e');
+      SnackbarHelper.showError('퇴사 처리에 실패했습니다.');
+    }
+  }
+
+// ✅ 복직 처리 (수정)
+  Future<void> rehireEmployee(String employeeId) async {
+    try {
+      await _employeeService.rehireEmployee(employeeId);
+
+      // 목록 갱신
+      await loadEmployees();
+      await loadResignedEmployees();
+
+      // ✅ 통계 재계산
+      await calculateMonthlyStats();
+
+      SnackbarHelper.showSuccess('복직 처리되었습니다.');
+    } catch (e) {
+      print('복직 처리 오류: $e');
+      SnackbarHelper.showError('복직 처리에 실패했습니다.');
     }
   }
 
@@ -243,7 +307,10 @@ class WorkplaceDetailController extends GetxController {
 
   /// 월별 통계 계산
   Future<void> calculateMonthlyStats() async {
-    if (employees.isEmpty) {
+    // ✅ 수정: 재직중 + 퇴사 직원 모두 포함
+    final allEmployees = [...employees, ...resignedEmployees];
+
+    if (allEmployees.isEmpty) {
       monthlyStats.value = {};
       return;
     }
@@ -282,27 +349,24 @@ class WorkplaceDetailController extends GetxController {
 
       List<Map<String, dynamic>> employeeSalaries = [];
 
-      for (var employee in employees) {
-        // 해당 직원의 이번 달 스케줄 필터링
+      // ✅ 재직중 + 퇴사 직원 모두 순회
+      for (var employee in allEmployees) {
         final employeeSchedules = monthlySchedules
             .where((schedule) => schedule.employeeId == employee.id)
             .toList();
 
         if (employeeSchedules.isEmpty) continue;
 
-        // 해당 직원의 전달 스케줄 필터링
         final employeePreviousSchedules = previousMonthSchedules
             .where((schedule) => schedule.employeeId == employee.id)
             .toList();
 
-        // 급여 계산 (전달 스케줄 포함)
         final salaryData = SalaryCalculator.calculateMonthlySalary(
           schedules: employeeSchedules,
           hourlyWage: employee.hourlyWage.toDouble(),
           previousMonthSchedules: employeePreviousSchedules,
         );
 
-        // 근무일수 계산
         final workDays = employeeSchedules
             .map((s) => DateTime(s.date.year, s.date.month, s.date.day))
             .toSet()
@@ -314,7 +378,6 @@ class WorkplaceDetailController extends GetxController {
           'workDays': workDays,
         });
 
-        // 전체 합계 계산
         totalHours += salaryData['totalHours'];
         totalRegularHours += salaryData['regularHours'];
         totalSubstituteHours += salaryData['substituteHours'];
@@ -467,6 +530,15 @@ class WorkplaceDetailController extends GetxController {
     } catch (e) {
       print('스케줄 삭제 오류: $e');
       rethrow;
+    }
+  }
+
+  // ✅ employeeId로 직원 정보 찾기 메서드 추가
+  Employee? getEmployeeById(String employeeId) {
+    try {
+      return allEmployees.firstWhere((e) => e.id == employeeId);
+    } catch (e) {
+      return null;
     }
   }
 }

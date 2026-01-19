@@ -304,9 +304,12 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
     final employee = employeeSalary['employee'];
     final salaryData = employeeSalary['salaryData'];
     final workDays = employeeSalary['workDays'];
-    final paymentRecord = employeeSalary['paymentRecord']; // ✅ 추가
+    final paymentRecord = employeeSalary['paymentRecord'];
 
-    // ✅ 지급 완료 여부에 따른 스타일
+    // ✅ 퇴사 여부 확인 추가
+    final isResigned = employee.employmentStatus == 'resigned';
+
+    // 지급 완료 여부에 따른 스타일
     final isPaid = paymentRecord != null;
     final textColor = isPaid ? Colors.grey[600] : Colors.black;
     final amountColor = isPaid ? Colors.grey[600] : AppTheme.primaryColor;
@@ -314,8 +317,8 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () async { // ✅ async 추가
-          final result = await Get.toNamed( // ✅ await 추가
+        onTap: () async {
+          final result = await Get.toNamed(
             AppRoutes.salaryView,
             arguments: {
               'employee': employee,
@@ -324,14 +327,14 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
             },
           );
 
-          // ✅ 지급 상태가 변경되었으면 새로고침
+          // 지급 상태가 변경되었으면 새로고침
           if (result == true) {
             controller.loadMonthlySalaries();
           }
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-        padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -343,7 +346,8 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
                     height: 48,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: isPaid // ✅ 지급 완료 시 회색
+                        // ✅ 수정: 퇴사자도 회색 표시
+                        colors: (isPaid || isResigned)
                             ? [Colors.grey[400]!, Colors.grey[300]!]
                             : [AppTheme.primaryColor, AppTheme.primaryLightColor],
                       ),
@@ -375,12 +379,34 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: textColor, // ✅ 지급 완료 시 회색
+                                  // ✅ 수정: 퇴사자도 회색 텍스트
+                                  color: (isPaid || isResigned) ? Colors.grey[600] : Colors.black,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            // ✅ 지급 완료 표시
+
+                            // ✅ 퇴사 배지 추가
+                            if (isResigned) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[300],
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '퇴사',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey[700],
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+
+                            // 지급 완료 표시
                             if (isPaid) ...[
                               const SizedBox(width: 8),
                               Container(
@@ -421,7 +447,7 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
                             color: Colors.grey[600],
                           ),
                         ),
-                        // ✅ 지급일시 표시
+                        // 지급일시 표시
                         if (isPaid) ...[
                           const SizedBox(height: 2),
                           Text(
@@ -430,6 +456,18 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
                               fontSize: 12,
                               color: Colors.green[700],
                               fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+
+                        // ✅ 퇴사일 표시 추가
+                        if (isResigned && employee.resignedAt != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '퇴사: ${DateFormat('yyyy-MM-dd').format(employee.resignedAt)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
                             ),
                           ),
                         ],
@@ -449,11 +487,11 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
                 children: [
                   Text(
                     '기본급',
-                    style: TextStyle(fontSize: 13, color: textColor), // ✅ 회색
+                    style: TextStyle(fontSize: 13, color: textColor),
                   ),
                   Text(
                     '${currencyFormat.format(salaryData['basicPay'])}원',
-                    style: TextStyle(fontSize: 13, color: textColor), // ✅ 회색
+                    style: TextStyle(fontSize: 13, color: textColor),
                   ),
                 ],
               ),
@@ -463,11 +501,11 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
                 children: [
                   Text(
                     '주휴수당',
-                    style: TextStyle(fontSize: 13, color: textColor), // ✅ 회색
+                    style: TextStyle(fontSize: 13, color: textColor),
                   ),
                   Text(
                     '${currencyFormat.format(salaryData['weeklyHolidayPay'])}원',
-                    style: TextStyle(fontSize: 13, color: textColor), // ✅ 회색
+                    style: TextStyle(fontSize: 13, color: textColor),
                   ),
                 ],
               ),
@@ -477,11 +515,11 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
                 children: [
                   Text(
                     '세금 (3.3%)',
-                    style: TextStyle(fontSize: 13, color: textColor), // ✅ 회색
+                    style: TextStyle(fontSize: 13, color: textColor),
                   ),
                   Text(
                     '-${currencyFormat.format(salaryData['tax'])}원',
-                    style: TextStyle(fontSize: 13, color: textColor), // ✅ 회색
+                    style: TextStyle(fontSize: 13, color: textColor),
                   ),
                 ],
               ),
@@ -499,7 +537,7 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: textColor, // ✅ 회색
+                      color: textColor,
                     ),
                   ),
                   Text(
@@ -507,7 +545,7 @@ class MonthlySalarySummaryView extends GetView<MonthlySalarySummaryController> {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: amountColor, // ✅ 지급 완료 시 회색
+                      color: amountColor,
                     ),
                   ),
                 ],

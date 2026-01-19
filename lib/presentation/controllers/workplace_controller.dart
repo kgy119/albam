@@ -6,6 +6,7 @@ import '../../core/services/employee_service.dart';
 import '../../core/services/subscription_limit_service.dart';
 import '../../core/utils/salary_calculator.dart';
 import '../../core/utils/snackbar_helper.dart';
+import '../../data/models/schedule_model.dart';
 import '../../data/models/workplace_model.dart';
 
 class WorkplaceController extends GetxController {
@@ -222,14 +223,17 @@ class WorkplaceController extends GetxController {
     return employeeCountMap[workplaceId] ?? 0;
   }
 
-  /// ✅ 모든 사업장의 이번 달 급여 합계 조회
+  /// ✅ 모든 사업장의 이번 달 급여 합계 조회 (수정)
   Future<void> loadAllMonthlySalaries() async {
     try {
       final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day); // ✅ 오늘 날짜
 
       for (var workplace in workplaces) {
-        // 해당 사업장의 직원 목록 조회
-        final employees = await _employeeService.getEmployees(workplace.id);
+        // ✅ 수정: 재직중 + 퇴사 직원 모두 조회
+        final activeEmployees = await _employeeService.getEmployees(workplace.id);
+        final resignedEmployees = await _employeeService.getResignedEmployees(workplace.id);
+        final employees = [...activeEmployees, ...resignedEmployees];
 
         if (employees.isEmpty) {
           monthlySalaryMap[workplace.id] = 0;
@@ -243,27 +247,61 @@ class WorkplaceController extends GetxController {
           month: now.month,
         );
 
+        // ✅ 추가: 오늘까지의 스케줄만 필터링
+        final schedulesUntilToday = schedules.where((schedule) {
+          final scheduleDate = DateTime(
+            schedule.date.year,
+            schedule.date.month,
+            schedule.date.day,
+          );
+          return scheduleDate.isBefore(today) || scheduleDate.isAtSameMomentAs(today);
+        }).toList();
+
+        // 전달 스케줄 조회 (주휴수당 계산용)
+        List<Schedule> previousMonthSchedules = [];
+        if (now.month == 1) {
+          previousMonthSchedules = await ScheduleService().getMonthlySchedules(
+            workplaceId: workplace.id,
+            year: now.year - 1,
+            month: 12,
+          );
+        } else {
+          previousMonthSchedules = await ScheduleService().getMonthlySchedules(
+            workplaceId: workplace.id,
+            year: now.year,
+            month: now.month - 1,
+          );
+        }
+
         // 직원별로 급여 계산
         double totalNetPay = 0;
 
         for (var employee in employees) {
-          // 해당 직원의 이번 달 스케줄만 필터링
-          final employeeSchedules = schedules
+          // ✅ 수정: 오늘까지의 스케줄만 사용
+          final employeeSchedules = schedulesUntilToday
               .where((schedule) => schedule.employeeId == employee.id)
               .toList();
 
           if (employeeSchedules.isEmpty) continue;
 
+          // 해당 직원의 전달 스케줄
+          final employeePreviousSchedules = previousMonthSchedules
+              .where((schedule) => schedule.employeeId == employee.id)
+              .toList();
+
           // 급여 계산 (SalaryCalculator 사용)
           final salaryData = SalaryCalculator.calculateMonthlySalary(
             schedules: employeeSchedules,
             hourlyWage: employee.hourlyWage.toDouble(),
+            previousMonthSchedules: employeePreviousSchedules, // ✅ 추가
           );
 
           totalNetPay += salaryData['netPay'];
         }
 
         monthlySalaryMap[workplace.id] = totalNetPay;
+
+        print('${workplace.name} 이번달 급여 (오늘까지): ${totalNetPay.toStringAsFixed(0)}원');
       }
     } catch (e) {
       print('월별 급여 조회 오류: $e');

@@ -334,6 +334,10 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
 
   /// 오늘 스케줄 카드
   Widget _buildTodayScheduleCard(schedule, bool isWorkingNow) {
+    // ✅ 직원 정보 가져오기
+    final employee = controller.getEmployeeById(schedule.employeeId);
+    final isResigned = employee?.employmentStatus == 'resigned';
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -369,20 +373,25 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
                 // 직원 아바타
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: schedule.isSubstitute
+                  // ✅ 퇴사자는 회색 표시
+                  backgroundColor: isResigned
+                      ? Colors.grey[400]
+                      : schedule.isSubstitute
                       ? Colors.orange.withOpacity(0.1)
                       : AppTheme.primaryColor.withOpacity(0.1),
                   child: Text(
                     schedule.employeeName.isNotEmpty ? schedule.employeeName[0] : '?',
                     style: TextStyle(
-                      color: schedule.isSubstitute
+                      // ✅ 퇴사자는 흰색 텍스트
+                      color: isResigned
+                          ? Colors.white
+                          : schedule.isSubstitute
                           ? Colors.orange[700]
                           : AppTheme.primaryColor,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-
                 const SizedBox(width: 12),
 
                 // 직원 정보
@@ -392,77 +401,54 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            schedule.employeeName,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: isWorkingNow ? AppTheme.primaryColor : Colors.grey[800],
+                          Flexible(
+                            child: Text(
+                              schedule.employeeName,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                // ✅ 퇴사자는 회색 텍스트
+                                color: isResigned ? Colors.grey[600] : Colors.black,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (schedule.isSubstitute) ...[
+
+                          // ✅ 퇴사 배지
+                          if (isResigned) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.orange,
-                                borderRadius: BorderRadius.circular(8),
+                                color: Colors.grey[300],
+                                borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Text(
-                                '대체',
+                              child: Text(
+                                '퇴사',
                                 style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
+                                  fontSize: 9,
+                                  color: Colors.grey[700],
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
                           ],
-                          // ✅ 메모 표시 수정
-                          if (schedule.memo != null && schedule.memo!.isNotEmpty) ...[
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              child: Tooltip(
-                                triggerMode: TooltipTriggerMode.tap, // ⭐ 탭으로 표시
-                                message: schedule.memo!,
-                                padding: const EdgeInsets.all(12),
-                                margin: const EdgeInsets.symmetric(horizontal: 16),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[800],
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                textStyle: const TextStyle(
+
+                          // 대체근무 표시
+                          if (schedule.isSubstitute) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                '대체',
+                                style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 13,
-                                ),
-                                preferBelow: false,
-                                waitDuration: Duration.zero, // 탭이므로 대기시간 제거
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue[100],
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.blue[300]!),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.note,
-                                        size: 12,
-                                        color: Colors.blue[700],
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '메모',
-                                        style: TextStyle(
-                                          color: Colors.blue[700],
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
@@ -470,51 +456,54 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.access_time,
-                            size: 14,
-                            color: isWorkingNow ? AppTheme.primaryColor : Colors.grey[600],
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            schedule.timeRangeString,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isWorkingNow ? AppTheme.primaryColor : Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isWorkingNow
-                                  ? AppTheme.primaryColor
-                                  : Colors.grey[400],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              schedule.workTimeString,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        schedule.timeRangeString,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
                       ),
                     ],
                   ),
                 ),
 
-                // 메뉴 버튼
-                const SizedBox(width: 4),
+                // 근무시간 표시
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      schedule.workTimeString,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: isWorkingNow ? AppTheme.primaryColor : Colors.grey[700],
+                      ),
+                    ),
+                    if (isWorkingNow)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          '근무중',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+
+                // 팝업 메뉴
                 PopupMenuButton<String>(
+                  padding: EdgeInsets.zero,
                   icon: Icon(
                     Icons.more_vert,
-                    size: 20,
                     color: isWorkingNow ? AppTheme.primaryColor : Colors.grey[600],
                   ),
                   shape: RoundedRectangleBorder(
@@ -553,7 +542,7 @@ class WorkplaceDetailView extends GetView<WorkplaceDetailController> {
               ],
             ),
 
-            // 시간 바 추가
+            // 시간 바
             const SizedBox(height: 12),
             _buildTodayTimeBar(schedule),
           ],

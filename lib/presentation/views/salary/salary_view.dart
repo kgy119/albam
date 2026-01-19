@@ -267,11 +267,8 @@ class SalaryView extends GetView<SalaryController> {
             _buildWeekHeader(),
             const SizedBox(height: 8),
 
-            // 달력 그리드 - 높이 제한 추가
-            SizedBox(
-              height: 240, // 고정 높이 설정 (6주 * 40픽셀)
-              child: _buildCalendarGrid(year, month),
-            ),
+            // 달력 그리드 - 화면 너비에 맞춰 자동 조정
+            _buildCalendarGrid(year, month),
 
             const SizedBox(height: 8),
 
@@ -336,13 +333,12 @@ class SalaryView extends GetView<SalaryController> {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 7,
-        childAspectRatio: 1.0,
-        crossAxisSpacing: 4,
-        mainAxisSpacing: 4,
+        childAspectRatio: 0.9, // 적절한 비율로 조정
+        crossAxisSpacing: 2, // 간격 줄임
+        mainAxisSpacing: 2, // 간격 줄임
       ),
-      itemCount: 42, // 6주
+      itemCount: 42,
       itemBuilder: (context, index) {
-        // 일요일 시작 (0: 일요일, 1: 월요일, ..., 6: 토요일)
         final day = index - firstDayOfWeek + 1;
 
         if (day <= 0 || day > daysInMonth) {

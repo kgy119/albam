@@ -20,6 +20,7 @@ class ScheduleSettingController extends GetxController {
 
   // 직원 목록
   RxList<Employee> employees = <Employee>[].obs;
+  RxList<Employee> resignedEmployees = <Employee>[].obs; // ✅ 추가
 
   // 해당 날짜의 스케줄 목록
   RxList<Schedule> schedules = <Schedule>[].obs;
@@ -27,6 +28,9 @@ class ScheduleSettingController extends GetxController {
   // 로딩 상태
   RxBool isLoading = false.obs;
   RxBool isSaving = false.obs;
+
+  List<Employee> get allEmployees => [...employees, ...resignedEmployees];
+
 
   @override
   void onInit() {
@@ -42,12 +46,17 @@ class ScheduleSettingController extends GetxController {
   /// 직원 목록 로드
   Future<void> loadEmployees() async {
     try {
+      // ✅ 수정: 재직중 + 퇴사 직원 모두 조회
       employees.value = await _employeeService.getEmployees(workplace.id);
+      resignedEmployees.value = await _employeeService.getResignedEmployees(workplace.id);
+
+      print('재직중 직원: ${employees.length}명, 퇴사 직원: ${resignedEmployees.length}명');
     } catch (e) {
       print('직원 목록 로드 오류: $e');
-      SnackbarHelper.showError('직원 목록을 불러오는데 실패했습니다.'); // 수정
+      SnackbarHelper.showError('직원 목록을 불러오는데 실패했습니다.');
     }
   }
+
 
   /// 해당 날짜의 스케줄 로드
   Future<void> loadSchedules() async {
@@ -721,19 +730,31 @@ class ScheduleSettingController extends GetxController {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: schedules.map((schedule) {
+                    // ✅ 추가: 직원 정보 조회
+                    final employee = allEmployees.firstWhereOrNull(
+                          (e) => e.id == schedule.employeeId,
+                    );
+                    final isResigned = employee?.employmentStatus == 'resigned';
+
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Row(
                         children: [
                           CircleAvatar(
                             radius: 16,
-                            backgroundColor: schedule.isSubstitute
+                            // ✅ 수정: 퇴사자는 회색
+                            backgroundColor: isResigned
+                                ? Colors.grey[400]
+                                : schedule.isSubstitute
                                 ? Colors.orange.withOpacity(0.2)
                                 : Theme.of(Get.context!).primaryColor.withOpacity(0.2),
                             child: Text(
                               schedule.employeeName.isNotEmpty ? schedule.employeeName[0] : '?',
                               style: TextStyle(
-                                color: schedule.isSubstitute
+                                // ✅ 수정: 퇴사자는 흰색 텍스트
+                                color: isResigned
+                                    ? Colors.white
+                                    : schedule.isSubstitute
                                     ? Colors.orange[700]
                                     : Theme.of(Get.context!).primaryColor,
                                 fontSize: 12,
@@ -750,11 +771,37 @@ class ScheduleSettingController extends GetxController {
                                   children: [
                                     Text(
                                       schedule.employeeName,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 13,
+                                        // ✅ 추가: 퇴사자는 회색 텍스트
+                                        color: isResigned ? Colors.grey[600] : Colors.black,
                                       ),
                                     ),
+
+                                    // ✅ 추가: 퇴사 배지
+                                    if (isResigned) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[300],
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          '퇴사',
+                                          style: TextStyle(
+                                            color: Colors.grey[700],
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+
                                     if (schedule.isSubstitute) ...[
                                       const SizedBox(width: 6),
                                       Container(

@@ -61,15 +61,18 @@ class MonthlySalarySummaryController extends GetxController {
     try {
       print('월별 급여 로드 시작: ${year.value}년 ${month.value}월');
 
-      // 직원 목록 조회
-      final employees = await _employeeService.getEmployees(workplace.value!.id);
+      // ✅ 재직중 + 퇴사 직원 모두 조회
+      final activeEmployees = await _employeeService.getEmployees(workplace.value!.id);
+      final resignedEmployees = await _employeeService.getResignedEmployees(workplace.value!.id);
+
+      final employees = [...activeEmployees, ...resignedEmployees];
 
       if (employees.isEmpty) {
         monthlyStats.value = {};
         return;
       }
 
-      print('직원 수: ${employees.length}명');
+      print('직원 수: ${employees.length}명 (재직: ${activeEmployees.length}, 퇴사: ${resignedEmployees.length})');
 
       // 해당 월의 스케줄 조회
       final schedules = await _scheduleService.getMonthlySchedules(
@@ -105,7 +108,7 @@ class MonthlySalarySummaryController extends GetxController {
       );
 
       // 통계 계산
-      await _calculateStats(employees, schedules, previousMonthSchedules, paymentRecords); // ✅ 수정
+      await _calculateStats(employees, schedules, previousMonthSchedules, paymentRecords);
     } catch (e) {
       print('급여 로드 오류: $e');
       SnackbarHelper.showError('급여 정보를 불러오는데 실패했습니다.');

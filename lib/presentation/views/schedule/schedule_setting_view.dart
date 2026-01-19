@@ -292,6 +292,12 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
   }
 
   Widget _buildScheduleCard(schedule) {
+    // ✅ 직원 정보 가져오기
+    final employee = controller.allEmployees.firstWhereOrNull(
+          (e) => e.id == schedule.employeeId,
+    );
+    final isResigned = employee?.employmentStatus == 'resigned';
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -303,13 +309,19 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
               children: [
                 // 직원 아바타
                 CircleAvatar(
-                  backgroundColor: schedule.isSubstitute
+                  // ✅ 수정: 퇴사자는 회색
+                  backgroundColor: isResigned
+                      ? Colors.grey[400]
+                      : schedule.isSubstitute
                       ? Colors.orange.withOpacity(0.1)
                       : Theme.of(Get.context!).primaryColor.withOpacity(0.1),
                   child: Text(
                     schedule.employeeName.isNotEmpty ? schedule.employeeName[0] : '?',
                     style: TextStyle(
-                      color: schedule.isSubstitute
+                      // ✅ 수정: 퇴사자는 흰색 텍스트
+                      color: isResigned
+                          ? Colors.white
+                          : schedule.isSubstitute
                           ? Colors.orange[700]
                           : Theme.of(Get.context!).primaryColor,
                       fontWeight: FontWeight.bold,
@@ -329,13 +341,36 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
                           Flexible(
                             child: Text(
                               schedule.employeeName,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
+                                // ✅ 수정: 퇴사자는 회색 텍스트
+                                color: isResigned ? Colors.grey[600] : Colors.black,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+
+                          // ✅ 추가: 퇴사 배지
+                          if (isResigned) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[300],
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '퇴사',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[700],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+
                           // 대체근무 표시
                           if (schedule.isSubstitute) ...[
                             const SizedBox(width: 8),
@@ -355,12 +390,13 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
                               ),
                             ),
                           ],
+
                           // 메모 표시
                           if (schedule.memo != null && schedule.memo!.isNotEmpty) ...[
                             const SizedBox(width: 8),
                             GestureDetector(
                               child: Tooltip(
-                                triggerMode: TooltipTriggerMode.tap, // ⭐ 탭으로 표시
+                                triggerMode: TooltipTriggerMode.tap,
                                 message: schedule.memo!,
                                 padding: const EdgeInsets.all(12),
                                 margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -373,7 +409,7 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
                                   fontSize: 13,
                                 ),
                                 preferBelow: false,
-                                waitDuration: Duration.zero, // 탭이므로 대기시간 제거
+                                waitDuration: Duration.zero,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
@@ -406,8 +442,8 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
                           ],
                         ],
                       ),
-                      const SizedBox(height: 4), // ✅ 추가
-                      Row( // ✅ 시간 정보를 Row로 변경
+                      const SizedBox(height: 4),
+                      Row(
                         children: [
                           Text(
                             schedule.timeRangeString,
@@ -416,11 +452,14 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
                               color: Colors.grey[600],
                             ),
                           ),
-                          const SizedBox(width: 8), // ✅ 추가
-                          Container( // ✅ 근무시간을 여기로 이동
+                          const SizedBox(width: 8),
+                          Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: schedule.isSubstitute
+                              // ✅ 수정: 퇴사자는 회색 배경
+                              color: isResigned
+                                  ? Colors.grey[300]
+                                  : schedule.isSubstitute
                                   ? Colors.orange.withOpacity(0.1)
                                   : Theme.of(Get.context!).primaryColor.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(12),
@@ -430,7 +469,10 @@ class ScheduleSettingView extends GetView<ScheduleSettingController> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
-                                color: schedule.isSubstitute
+                                // ✅ 수정: 퇴사자는 회색 텍스트
+                                color: isResigned
+                                    ? Colors.grey[700]
+                                    : schedule.isSubstitute
                                     ? Colors.orange[700]
                                     : Theme.of(Get.context!).primaryColor,
                               ),

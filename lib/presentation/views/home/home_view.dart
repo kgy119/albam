@@ -233,7 +233,7 @@ class HomeView extends StatelessWidget {
                         Expanded(
                           child: _buildClickableStatChip(
                             icon: Icons.attach_money,
-                            label: '이번 달 급여',
+                            label: '급여 (${DateTime.now().day}일까지)',
                             value: monthlySalary > 0
                                 ? '${NumberFormat('#,###').format(monthlySalary)}원'
                                 : '-',
@@ -241,13 +241,12 @@ class HomeView extends StatelessWidget {
                             onTap: isLocked
                                 ? null
                                 : () {
-                              final now = DateTime.now();
                               Get.toNamed(
                                 AppRoutes.monthlySalarySummary,
                                 arguments: {
                                   'workplace': workplace,
-                                  'year': now.year,
-                                  'month': now.month,
+                                  'year': DateTime.now().year,
+                                  'month': DateTime.now().month,
                                 },
                               );
                             },

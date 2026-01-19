@@ -1272,15 +1272,13 @@ class _DeleteAccountDialog extends StatefulWidget {
   State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
 }
 class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
-  late TextEditingController _reasonController;
+
   @override
   void initState() {
     super.initState();
-    _reasonController = TextEditingController();
   }
   @override
   void dispose() {
-    _reasonController.dispose();
     super.dispose();
   }
   @override
@@ -1316,17 +1314,6 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                   _buildWarningItem('계정 정보'),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _reasonController,
-              decoration: const InputDecoration(
-                labelText: '탈퇴 사유 (선택)',
-                hintText: '예: 더 이상 서비스를 이용하지 않습니다',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-              maxLength: 200,
             ),
             const SizedBox(height: 8),
             Container(
@@ -1373,7 +1360,6 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
     );
   }
   Future<void> _handleDeleteAccount(BuildContext context) async {
-    final reason = _reasonController.text.trim();
     Navigator.of(context).pop();
 
     Get.dialog(
@@ -1383,9 +1369,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
 
     await Future.delayed(const Duration(milliseconds: 300));
 
-    final result = await widget.accountService.requestAccountDeletion(
-      reason: reason.isEmpty ? null : reason,
-    );
+    final result = await widget.accountService.requestAccountDeletion();
 
     Get.back();
 
