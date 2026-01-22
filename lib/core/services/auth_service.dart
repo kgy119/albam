@@ -158,7 +158,7 @@ class AuthService extends GetxService {
       await _supabase.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: redirectUrl,
-        authScreenLaunchMode: LaunchMode.externalApplication,
+        authScreenLaunchMode: LaunchMode.platformDefault,
         queryParams: {
           'prompt': 'select_account',  // ✅ 추가: 항상 계정 선택 화면 표시
         },
@@ -181,7 +181,7 @@ class AuthService extends GetxService {
       await _supabase.auth.signInWithOAuth(
         OAuthProvider.apple,
         redirectTo: redirectUrl,
-        authScreenLaunchMode: LaunchMode.externalApplication,
+        authScreenLaunchMode: LaunchMode.platformDefault,
       );
 
       return {'success': true};
