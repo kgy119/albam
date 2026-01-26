@@ -211,7 +211,6 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
     final user = authService.currentUser.value;
     final email = user?.email ?? '이메일 없음';
 
-    // ✅ SubscriptionService의 Rx 변수에서 직접 가져오기
     final subscription = subscriptionService.currentSubscription.value;
     final isPremium = subscription?.tier == 'premium' && (subscription?.isActive ?? false);
     final isCancelled = subscription != null &&
@@ -245,80 +244,53 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
 
             const SizedBox(height: 16),
 
-            // 회원 등급 & 혜택 버튼
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: isPremium ? Colors.amber[50] : Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isPremium ? Colors.amber[300]! : Colors.grey[300]!,
+            // 회원 등급
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                color: isPremium ? Colors.amber[50] : Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isPremium ? Colors.amber[300]! : Colors.grey[300]!,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        isPremium ? Icons.workspace_premium : Icons.person_outline,
+                        color: isPremium ? Colors.amber[700] : Colors.grey[600],
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isPremium ? '프리미엄 회원' : '무료 회원',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isPremium ? Colors.amber[900] : Colors.grey[800],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  if (isPremium && expiryDate != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      isCancelled
+                          ? '${DateFormat('yyyy년 M월 d일').format(expiryDate)}까지'
+                          : '다음 결제: ${DateFormat('yyyy년 M월 d일').format(expiryDate)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isCancelled ? Colors.orange[700] : Colors.grey[600],
+                        fontWeight: isCancelled ? FontWeight.w600 : FontWeight.normal,
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              isPremium ? Icons.workspace_premium : Icons.person_outline,
-                              color: isPremium ? Colors.amber[700] : Colors.grey[600],
-                              size: 24,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              isPremium ? '프리미엄 회원' : '무료 회원',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: isPremium ? Colors.amber[900] : Colors.grey[800],
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        // 만료일 또는 다음 결제일 표시
-                        if (isPremium && expiryDate != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            isCancelled
-                                ? '${DateFormat('yyyy년 M월 d일').format(expiryDate)}까지'
-                                : '다음 결제: ${DateFormat('yyyy년 M월 d일').format(expiryDate)}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isCancelled ? Colors.orange[700] : Colors.grey[600],
-                              fontWeight: isCancelled ? FontWeight.w600 : FontWeight.normal,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(width: 8),
-
-                OutlinedButton(
-                  onPressed: _showBenefitsDialog,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                    side: BorderSide(color: Colors.amber[700]!),
-                  ),
-                  child: Text(
-                    '프리미엄\n구독혜택',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.amber[900],
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-              ],
+                  ],
+                ],
+              ),
             ),
 
             // 구독 취소 경고 메시지
@@ -351,24 +323,25 @@ class _AccountSettingsViewState extends State<AccountSettingsView> with WidgetsB
               ),
             ],
 
-            // 프리미엄 구독하기 / 재구독하기 버튼
+            // ✅ 프리미엄 회원 가입 버튼 (무료 회원 또는 취소된 회원만)
             if (!isPremium || isCancelled) ...[
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _handleSubscribe,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Colors.amber[600],
-                    foregroundColor: Colors.white,
-                  ),
-                  child: Text(
-                    isCancelled ? '재구독하기' : '프리미엄 구독하기',
+                child: ElevatedButton.icon(
+                  onPressed: () => Get.toNamed(AppRoutes.premiumDetail),  // ✅ 상세 페이지로 이동
+                  icon: const Icon(Icons.workspace_premium),
+                  label: Text(
+                    isCancelled ? '프리미엄 재가입' : '프리미엄 회원 가입',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.amber[600],
+                    foregroundColor: Colors.white,
                   ),
                 ),
               ),

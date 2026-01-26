@@ -12,4 +12,5 @@ abstract class AppRoutes {
   static const monthlySalarySummary = '/monthly-salary-summary';
   static const accountSettings = '/account-settings';
   static const resetPassword = '/reset-password';
+  static const premiumDetail = '/premium-detail';
 }

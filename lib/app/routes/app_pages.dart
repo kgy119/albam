@@ -13,6 +13,7 @@ import '../../presentation/views/salary/monthly_salary_summary_view.dart';
 import '../../presentation/views/salary/salary_view.dart';
 import '../../presentation/views/schedule/schedule_setting_view.dart';
 import '../../presentation/views/settings/account_settings_view.dart';
+import '../../presentation/views/subscription/premium_detail_view.dart';
 import '../../presentation/views/workplace/workplace_detail_view.dart';
 import 'app_routes.dart';
 import '../../presentation/views/auth/login_view.dart';
@@ -92,6 +93,9 @@ class AppPages {
       name: AppRoutes.resetPassword,
       page: () => const ResetPasswordView(),
     ),
-
+    GetPage(
+      name: AppRoutes.premiumDetail,  // ✅ 추가
+      page: () => const PremiumDetailView(),
+    ),
   ];
 }
