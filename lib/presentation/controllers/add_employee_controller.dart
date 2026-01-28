@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
+import '../../app/routes/app_routes.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/services/storage_service.dart';
 import '../../core/services/subscription_limit_service.dart';
@@ -332,11 +333,10 @@ class AddEmployeeController extends GetxController {
               onPressed: () async {
                 Get.back(); // 다이얼로그 닫기
 
-                // ✅ 설정 화면으로 이동하고 돌아올 때까지 대기
-                await Get.toNamed('/account-settings');
+                // ✅ 프리미엄 상세 페이지로 직접 이동
+                await Get.toNamed(AppRoutes.premiumDetail);
 
-                // ✅ 설정 화면에서 돌아온 후 구독 상태 새로고침
-                print('🔄 설정 화면에서 복귀 - 구독 상태 새로고침');
+                // 돌아온 후 구독 상태 새로고침
                 await _limitService.getUserSubscriptionLimits();
               },
               style: ElevatedButton.styleFrom(

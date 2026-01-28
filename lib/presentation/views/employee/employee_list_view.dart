@@ -22,10 +22,14 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
       child: Scaffold(
         appBar: AppBar(
           title: Text('${controller.workplace.name} 직원 관리'),
-          bottom: const TabBar( // ✅ 추가
+          bottom: TabBar(
             tabs: [
-              Tab(text: '재직중'),
-              Tab(text: '퇴사자'),
+              Tab(
+                child: Obx(() => Text('재직중 (${controller.employees.length})')),
+              ),
+              Tab(
+                child: Obx(() => Text('퇴사자 (${controller.resignedEmployees.length})')),
+              ),
             ],
           ),
         ),
@@ -702,7 +706,7 @@ class EmployeeListView extends GetView<WorkplaceDetailController> {
               ElevatedButton(
                 onPressed: () {
                   Get.back();
-                  Get.toNamed(AppRoutes.accountSettings);
+                  Get.toNamed(AppRoutes.premiumDetail);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.amber[600],

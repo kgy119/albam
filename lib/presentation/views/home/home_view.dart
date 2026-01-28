@@ -535,7 +535,7 @@ class HomeView extends StatelessWidget {
               ElevatedButton(
                 onPressed: () {
                   Get.back();
-                  Get.toNamed(AppRoutes.accountSettings);
+                  Get.toNamed(AppRoutes.premiumDetail);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.amber[600],
